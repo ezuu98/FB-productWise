@@ -14,15 +14,17 @@ export default function ProductPickers({ items }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
   const [active, setActive] = useState<"name" | "code" | null>(null);
 
+  const norm = (s: string) => s.normalize("NFKD").toLowerCase();
+
   const namePool = useMemo(() => {
-    const q = qName.trim().toLowerCase();
-    return q ? items.filter((i) => i.label.toLowerCase().includes(q)) : items;
+    const q = norm(qName.trim());
+    return q ? items.filter((i) => norm(i.label).startsWith(q)) : items;
   }, [items, qName]);
 
   const codePool = useMemo(() => {
-    const q = qCode.trim().toLowerCase();
+    const q = norm(qCode.trim());
     return q
-      ? items.filter((i) => (i.code ?? "").toLowerCase().includes(q))
+      ? items.filter((i) => norm(i.code ?? "").startsWith(q))
       : items.filter((i) => (i.code ?? "") !== "");
   }, [items, qCode]);
 
