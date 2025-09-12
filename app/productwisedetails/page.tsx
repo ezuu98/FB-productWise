@@ -20,13 +20,43 @@ function productCode(row: Record<string, any>) {
   );
 }
 
+async function fetchAllInventory(supabase: ReturnType<typeof createServerSupabase>) {
+  const pageSize = 1000;
+  const all: any[] = [];
+  let offset = 0;
+  let lastError: any = null;
+
+  // Loop until fewer than pageSize rows are returned
+  // Using range to bypass Supabase's per-request limit
+  while (true) {
+    const { data, error } = await supabase
+      .from("inventory")
+      .select("*")
+      .order("name", { ascending: true })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) {
+      lastError = error;
+      break;
+    }
+
+    if (data && data.length) {
+      all.push(...data);
+    }
+
+    if (!data || data.length < pageSize) break;
+    offset += pageSize;
+
+    // Safety stop at ~100k rows
+    if (offset > 100000) break;
+  }
+
+  return { data: all, error: lastError } as { data: any[]; error: any };
+}
+
 export default async function ProductWiseDetailsPage() {
   const supabase = createServerSupabase();
-  const { data: products, error } = await supabase
-    .from("inventory")
-    .select("*")
-    .order("name", { ascending: true })
-    .limit(1000);
+  const { data: products, error } = await fetchAllInventory(supabase);
 
   const items = (products ?? []).map((p: any) => ({
     id: String(p.id ?? productLabel(p) ?? productCode(p) ?? Math.random()),
