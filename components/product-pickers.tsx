@@ -12,7 +12,6 @@ export default function ProductPickers({ items }: Props) {
   const [qName, setQName] = useState("");
   const [qCode, setQCode] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
-  const [active, setActive] = useState<"name" | "code" | null>(null);
 
   const norm = (s: string) => s.normalize("NFKD").toLowerCase();
 
@@ -61,16 +60,11 @@ export default function ProductPickers({ items }: Props) {
             id="search-name"
             type="text"
             value={qName}
-            onChange={(e) => {
-              setActive("name");
-              setQName(e.target.value);
-            }}
-            onFocus={() => setActive("name")}
-            onBlur={() => setTimeout(() => setActive((a) => (a === "name" ? null : a)), 100)}
+            onChange={(e) => setQName(e.target.value)}
             placeholder="Type name..."
             className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
           />
-          {qName.trim() && active === "name" ? (
+          {qName.trim() ? (
             <select
               aria-label="Results by name"
               multiple
@@ -78,8 +72,6 @@ export default function ProductPickers({ items }: Props) {
               className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
               value={selected.filter((id) => namePoolIds.has(id))}
               onChange={onNameChange}
-              onFocus={() => setActive("name")}
-              onBlur={() => setTimeout(() => setActive((a) => (a === "name" ? null : a)), 100)}
             >
               {namePool.map((it) => (
                 <option key={it.id} value={it.id}>
@@ -98,16 +90,11 @@ export default function ProductPickers({ items }: Props) {
             id="search-code"
             type="text"
             value={qCode}
-            onChange={(e) => {
-              setActive("code");
-              setQCode(e.target.value);
-            }}
-            onFocus={() => setActive("code")}
-            onBlur={() => setTimeout(() => setActive((a) => (a === "code" ? null : a)), 100)}
+            onChange={(e) => setQCode(e.target.value)}
             placeholder="Type barcode..."
             className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
           />
-          {qCode.trim() && active === "code" ? (
+          {qCode.trim() ? (
             <select
               aria-label="Results by barcode"
               multiple
@@ -115,8 +102,6 @@ export default function ProductPickers({ items }: Props) {
               className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
               value={selected.filter((id) => codePoolIds.has(id))}
               onChange={onCodeChange}
-              onFocus={() => setActive("code")}
-              onBlur={() => setTimeout(() => setActive((a) => (a === "code" ? null : a)), 100)}
             >
               {codePool.map((it) => (
                 <option key={it.id} value={it.id}>
