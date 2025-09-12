@@ -51,14 +51,6 @@ export default async function ProductWiseDetailsPage() {
           )}
         </div>
 
-        <div className="mt-24 flex flex-col items-center justify-center text-center" aria-busy="true" aria-live="polite">
-          <span
-            className="h-12 w-12 animate-spin rounded-full border-4 border-gray-200 border-t-gray-400"
-            aria-hidden="true"
-          />
-          <p className="mt-6 text-gray-700">Loading inventory data...</p>
-          <p className="mt-2 text-sm text-gray-500">This may take a few moments for large datasets</p>
-        </div>
       </section>
     </main>
   );
