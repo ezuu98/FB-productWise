@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import FreshBasketHeader from "@/components/freshbasket-header";
 import { createServerSupabase } from "@/lib/supabase/server";
+import ProductMultiSelect from "@/components/product-multi-select";
 
 export const metadata: Metadata = {
   title: "FreshBasket — Live Inventory Tracking",
@@ -23,6 +24,11 @@ export default async function ProductWiseDetailsPage() {
     .order("name", { ascending: true })
     .limit(1000);
 
+  const items = (products ?? []).map((p: any) => ({
+    id: String(p.id ?? productLabel(p)),
+    label: productLabel(p),
+  }));
+
   return (
     <main className="min-h-screen bg-white text-gray-900">
       <FreshBasketHeader />
@@ -31,23 +37,7 @@ export default async function ProductWiseDetailsPage() {
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Live Inventory Tracking</h1>
 
         <div className="mt-6 w-full max-w-md">
-          <label htmlFor="product-select" className="block text-sm font-medium text-gray-700">
-            Products
-          </label>
-          <select
-            id="product-select"
-            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
-            defaultValue=""
-          >
-            <option value="" disabled>
-              Select a product
-            </option>
-            {products?.map((p: any) => (
-              <option key={p.id ?? productLabel(p)} value={p.id ?? productLabel(p)}>
-                {productLabel(p)}
-              </option>
-            ))}
-          </select>
+          <ProductMultiSelect items={items} />
           {error && (
             <p className="mt-2 text-sm text-red-600">Failed to load products: {error.message}</p>
           )}
