@@ -85,9 +85,8 @@ export default function ProductPickers({ items }: Props) {
                 </option>
               ))}
             </select>
-          ) : (
-            <p className="mt-2 text-sm text-gray-500">Start typing to search by name</p>
-          )}
+          ) : null
+          }
         </div>
         <div>
           <label htmlFor="search-code" className="block text-sm font-medium text-gray-700">
@@ -123,9 +122,8 @@ export default function ProductPickers({ items }: Props) {
                 </option>
               ))}
             </select>
-          ) : (
-            <p className="mt-2 text-sm text-gray-500">Start typing to search by barcode</p>
-          )}
+          ) : null
+          }
         </div>
       </div>
 
