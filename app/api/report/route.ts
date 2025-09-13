@@ -83,7 +83,9 @@ export async function POST(req: Request) {
       for (const row of data ?? []) {
         const wh = String(row[col as keyof typeof row]);
         if (!byWarehouse[wh]) byWarehouse[wh] = {};
-        byWarehouse[wh][mv] = (byWarehouse[wh][mv] ?? 0) + Number(row.quantity ?? 0);
+        const rawQty = Number(row.quantity ?? 0);
+        const qty = mv === "sales_returns" ? Math.abs(rawQty) : rawQty;
+        byWarehouse[wh][mv] = (byWarehouse[wh][mv] ?? 0) + qty;
       }
     }
 
