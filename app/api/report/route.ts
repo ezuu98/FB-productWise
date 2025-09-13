@@ -42,7 +42,7 @@ const MOVEMENT_ALIASES: Record<string, string[]> = {
   wastages: ["wastages", "wastage"],
   consumption: ["consumption", "consumptions"],
   transfer_in: ["transfer_in", "transfer"],
-  transfer_out: ["transfer_out"],
+  transfer_out: ["transfer_out", "transfer"],
 };
 
 export async function POST(req: Request) {
