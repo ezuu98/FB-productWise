@@ -513,11 +513,6 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
 
       {report && (
         <>
-          <div className="mt-6">
-            <h2 className="text-2xl font-bold text-center text-gray-900">
-              {(fromDate || "—")} to {(toDate || "—")}
-            </h2>
-          </div>
           {selectedItems.map((prod) => {
             const pid = String(prod.id);
             const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
