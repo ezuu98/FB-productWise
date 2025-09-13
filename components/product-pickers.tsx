@@ -122,6 +122,9 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedMovements, setSelectedMovements] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [report, setReport] = useState<Record<string, Record<string, number>> | null>(null);
 
   const movementOptions: Option[] = [
     { label: "Purchases", value: "purchase" },
