@@ -418,58 +418,66 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
 
       {report && (
         <>
-          {selectedItems.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold text-gray-800">Product</h3>
-              <p className="text-sm text-gray-900">
-                {(items.find((i) => i.id === selectedItems[0].id)?.label || selectedItems[0].id)}
-                {selectedItems[0].category ? ` — ${selectedItems[0].category}` : ""}
-                {selectedItems.length > 1 ? ` (+${selectedItems.length - 1} more)` : ""}
-              </p>
-            </div>
-          )}
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 border">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
-                {orderedMovements.map((mv) => (
-                  <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {[...(report.rows || [])]
-                .sort((a, b) => {
-                  const wa = warehouses.find((w) => String(w.id) === String(a.warehouseId))?.display_name || a.warehouseId;
-                  const wb = warehouses.find((w) => String(w.id) === String(b.warehouseId))?.display_name || b.warehouseId;
-                  if (wa !== wb) return wa.localeCompare(wb);
-                  const pa = items.find((i) => String(i.id) === String(a.productId))?.label || a.productId;
-                  const pb = items.find((i) => String(i.id) === String(b.productId))?.label || b.productId;
-                  return pa.localeCompare(pb);
-                })
-                .map((r) => {
-                  const whName = warehouses.find((w) => String(w.id) === String(r.warehouseId))?.display_name || r.warehouseId;
-                  return (
-                    <tr key={`${r.warehouseId}-${r.productId}`}>
-                      <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
-                      {orderedMovements.map((mv) => (
-                        <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
-                      ))}
-                    </tr>
-                  );
-                })}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
-                {orderedMovements.map((mv) => (
-                  <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{Number((report.totals || {})[mv] || 0)}</td>
-                ))}
-              </tr>
-            </tfoot>
-            </table>
-          </div>
+          {selectedItems.map((prod) => {
+            const pid = String(prod.id);
+            const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
+            if (rowsForProduct.length === 0) return null;
+            const productTotals: Record<string, number> = {};
+            for (const r of rowsForProduct) {
+              for (const mv of orderedMovements) {
+                productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
+              }
+            }
+            return (
+              <div key={pid} className="mt-6">
+                <h3 className="text-sm font-semibold text-gray-800">Product</h3>
+                <p className="text-sm text-gray-900">
+                  {(items.find((i) => i.id === prod.id)?.label || prod.id)}
+                  {prod.category ? ` — ${prod.category}` : ""}
+                  {prod.code ? ` — ${prod.code}` : ""}
+                </p>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 border">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
+                        {orderedMovements.map((mv) => (
+                          <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {[...rowsForProduct]
+                        .sort((a, b) => {
+                          const wa = warehouses.find((w) => String(w.id) === String(a.warehouseId))?.display_name || a.warehouseId;
+                          const wb = warehouses.find((w) => String(w.id) === String(b.warehouseId))?.display_name || b.warehouseId;
+                          return wa.localeCompare(wb);
+                        })
+                        .map((r) => {
+                          const whName = warehouses.find((w) => String(w.id) === String(r.warehouseId))?.display_name || r.warehouseId;
+                          return (
+                            <tr key={`${r.warehouseId}-${r.productId}`}>
+                              <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
+                              {orderedMovements.map((mv) => (
+                                <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                    <tfoot className="bg-gray-50">
+                      <tr>
+                        <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
+                        {orderedMovements.map((mv) => (
+                          <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{Number(productTotals[mv] || 0)}</td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
         </>
       )}
     </div>
