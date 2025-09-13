@@ -69,36 +69,47 @@ export async function POST(req: Request) {
     for (const mv of movements as string[]) {
       const col = pickWarehouseColumn(mv);
 
-      let query = supabase
-        .from("stock_movements")
-        .select("product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
-        .in("movement_type", MOVEMENT_ALIASES[mv] ?? [mv])
-        .in("product_id", productIds);
+      const pageSize = 1000;
+      let offset = 0;
 
-      if (warehouseIds?.length) {
-        // @ts-ignore dynamic column name
-        query = query.in(col as any, warehouseIds);
-      }
-      if (startISO) query = query.gte("created_at", startISO);
-      if (endISO) query = query.lt("created_at", endISO);
+      while (true) {
+        let query = supabase
+          .from("stock_movements")
+          .select("product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
+          .in("movement_type", MOVEMENT_ALIASES[mv] ?? [mv])
+          .in("product_id", productIds)
+          .order("created_at", { ascending: true })
+          .range(offset, offset + pageSize - 1);
 
-      const { data, error } = await query;
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-      for (const row of data ?? []) {
-        const warehouseId = String(row[col as keyof typeof row]);
-        const productId = String(row.product_id);
-        const key = `${warehouseId}|${productId}`;
-        const rawQty = Number(row.quantity ?? 0);
-        const qty = mv === "sales_returns" ? Math.abs(rawQty) : rawQty;
-
-        let agg = map.get(key);
-        if (!agg) {
-          agg = { warehouseId, productId, moves: {} };
-          map.set(key, agg);
+        if (warehouseIds?.length) {
+          // @ts-ignore dynamic column name
+          query = query.in(col as any, warehouseIds);
         }
-        agg.moves[mv] = (agg.moves[mv] ?? 0) + qty;
-        totals[mv] = (totals[mv] ?? 0) + qty;
+        if (startISO) query = query.gte("created_at", startISO);
+        if (endISO) query = query.lt("created_at", endISO);
+
+        const { data, error } = await query;
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+        for (const row of data ?? []) {
+          const warehouseId = String(row[col as keyof typeof row]);
+          const productId = String(row.product_id);
+          const key = `${warehouseId}|${productId}`;
+          const rawQty = Number(row.quantity ?? 0);
+          const qty = mv === "sales_returns" ? Math.abs(rawQty) : rawQty;
+
+          let agg = map.get(key);
+          if (!agg) {
+            agg = { warehouseId, productId, moves: {} };
+            map.set(key, agg);
+          }
+          agg.moves[mv] = (agg.moves[mv] ?? 0) + qty;
+          totals[mv] = (totals[mv] ?? 0) + qty;
+        }
+
+        if (!data || data.length < pageSize) break;
+        offset += pageSize;
+        if (offset > 500000) break; // safety cap
       }
     }
 
