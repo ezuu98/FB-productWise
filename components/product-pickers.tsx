@@ -32,6 +32,16 @@ function ChipMultiSelect({
     () => selected.map((v) => options.find((o) => o.value === v)).filter(Boolean) as Option[],
     [selected, options]
   );
+  const allSelected = options.length > 0 && selectedSet.size === options.length;
+  const someSelected = selectedSet.size > 0 && selectedSet.size < options.length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      onChange([]);
+    } else {
+      onChange(options.map((o) => o.value));
+    }
+  };
 
   const toggle = (val: string) => {
     if (selectedSet.has(val)) {
@@ -101,6 +111,18 @@ function ChipMultiSelect({
           aria-multiselectable
           onMouseDown={(e) => e.preventDefault()}
         >
+          <li>
+            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                aria-checked={someSelected ? "mixed" : allSelected}
+                onChange={toggleAll}
+                className="h-4 w-4 rounded border-gray-300 text-gray-700 focus:ring-gray-400"
+              />
+              <span className="text-gray-800">Select all</span>
+            </label>
+          </li>
           {options.map((opt) => (
             <li key={opt.value}>
               <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
