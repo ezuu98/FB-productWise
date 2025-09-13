@@ -343,30 +343,6 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
           selected={selectedWarehouses}
           onChange={setSelectedWarehouses}
         />
-        <div>
-          <label htmlFor="from-date" className="block text-sm font-medium text-gray-700">
-            From date
-          </label>
-          <input
-            id="from-date"
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
-          />
-        </div>
-        <div>
-          <label htmlFor="to-date" className="block text-sm font-medium text-gray-700">
-            To date
-          </label>
-          <input
-            id="to-date"
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
-          />
-        </div>
         <ChipMultiSelect
           id="move-multi"
           label="Type of movement"
@@ -494,11 +470,6 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
 
       {report && (
         <>
-          <div className="mt-6">
-            <h2 className="text-2xl font-bold text-center text-gray-900">
-              {(fromDate || "—")} to {(toDate || "—")}
-            </h2>
-          </div>
           {selectedItems.map((prod) => {
             const pid = String(prod.id);
             const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
