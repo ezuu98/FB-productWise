@@ -75,10 +75,11 @@ export async function POST(req: Request) {
       while (true) {
         let query = supabase
           .from("stock_movements")
-          .select("product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
+          .select("id, product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
           .in("movement_type", MOVEMENT_ALIASES[mv] ?? [mv])
           .in("product_id", productIds)
           .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
           .range(offset, offset + pageSize - 1);
 
         if (warehouseIds?.length) {
