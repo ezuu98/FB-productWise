@@ -414,7 +414,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 th, td { border: 1px solid #d1d5db; padding: 6px; font-family: Arial, sans-serif; font-size: 12px; text-align: center; }
                 th:first-child, td:first-child { text-align: left; }
                 thead th { background: #f9fafb; color: #374151; }
-                .title { background: #f3f4f6; font-weight: 600; font-size: 14px; text-align: center; }
+                .title { background: #f3f4f6; font-weight: 600; font-size: 14px; text-align: left; }
                 tfoot td { background: #f9fafb; font-weight: 600; }
               </style>
             `;
@@ -499,7 +499,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                       <tr className="bg-gray-100">
                         <th
                           colSpan={1 + orderedMovements.length}
-                          className="px-4 py-2 text-center text-sm font-semibold text-gray-800"
+                          className="px-4 py-2 text-left text-sm font-semibold text-gray-800"
                         >
                           {(items.find((i) => i.id === prod.id)?.label || prod.id)}
                           {prod.category ? ` — ${prod.category}` : ""}
