@@ -7,6 +7,8 @@ function pickWarehouseColumn(movement: string): "warehouse_id" | "warehouse_dest
     case "manufacturing":
     case "transfer_in":
       return "warehouse_dest_id";
+    case "transfer_out":
+      return "warehouse_id";
     case "sales":
     case "sales_returns":
     case "purchase_return":
@@ -40,6 +42,7 @@ const MOVEMENT_ALIASES: Record<string, string[]> = {
   wastages: ["wastages", "wastage"],
   consumption: ["consumption", "consumptions"],
   transfer_in: ["transfer_in", "transfer"],
+  transfer_out: ["transfer_in", "transfer_out"],
 };
 
 export async function POST(req: Request) {
