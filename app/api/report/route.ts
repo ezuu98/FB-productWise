@@ -31,6 +31,17 @@ function nextUtcStart(dateStr?: string | null) {
   return d.toISOString();
 }
 
+const MOVEMENT_ALIASES: Record<string, string[]> = {
+  purchase: ["purchase", "purchases"],
+  sales: ["sales", "sale"],
+  sales_returns: ["sales_returns", "sales_return", "sale_return"],
+  purchase_return: ["purchase_return", "purchase_returns"],
+  manufacturing: ["manufacturing", "manufacture"],
+  wastages: ["wastages", "wastage"],
+  consumption: ["consumption", "consumptions"],
+  transfer_in: ["transfer_in", "transfer"],
+};
+
 export async function POST(req: Request) {
   try {
     const { productIds, warehouseIds, movements, fromDate, toDate } = await req.json();
@@ -56,7 +67,7 @@ export async function POST(req: Request) {
       let query = supabase
         .from("stock_movements")
         .select("product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
-        .eq("movement_type", mv)
+        .in("movement_type", MOVEMENT_ALIASES[mv] ?? [mv])
         .in("product_id", productIds);
 
       if (warehouseIds?.length) {
