@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import FreshBasketHeader from "@/components/freshbasket-header";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
 import ProductPickers from "@/components/product-pickers";
 
 export const metadata: Metadata = {
@@ -51,12 +51,14 @@ async function fetchAllInventory(supabase: ReturnType<typeof createServerSupabas
 }
 
 async function fetchCategories(
-  supabase: ReturnType<typeof createServerSupabase>,
+  _supabase: ReturnType<typeof createServerSupabase>,
   ids: Array<string | number>
 ) {
   const unique = Array.from(new Set(ids.filter((v) => v !== null && v !== undefined)));
   const chunkSize = 500;
   const map = new Map<number, string>();
+
+  const admin = createServiceSupabase();
 
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
@@ -65,7 +67,7 @@ async function fetchCategories(
       .filter((v) => Number.isFinite(v));
 
     if (numbers.length) {
-      const { data } = await supabase
+      const { data } = await admin
         .from("categories")
         .select("categ_id, complete_name")
         .in("categ_id", numbers as any);
