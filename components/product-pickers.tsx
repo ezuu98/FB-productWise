@@ -161,43 +161,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     const n = Number(value);
     return Number.isFinite(n) ? n.toFixed(2) : "0.00";
   };
-  const csvEscape = (v: unknown) => {
-    const s = String(v ?? "");
-    if (s.includes(",") || s.includes("\n") || s.includes("\r") || s.includes("\"")) {
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
-    return s;
-  };
   const htmlEscape = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
-  const downloadCsv = () => {
-    if (!report) return;
-    const warehousesToUse = selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id));
-    const header = ["Product", "Category", "Code", "Warehouse", ...orderedMovements];
-    const lines: string[] = [header.map(csvEscape).join(",")];
-    for (const prod of selectedItems) {
-      const pid = String(prod.id);
-      const prodLabel = items.find((i) => i.id === prod.id)?.label || prod.id;
-      const prodCat = prod.category ?? "";
-      const prodCode = prod.code ?? "";
-      for (const wid of warehousesToUse) {
-        const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
-        const row = (report.rows || []).find((r) => String(r.productId) === pid && String(r.warehouseId) === String(wid)) || null;
-        const cells = [prodLabel, prodCat, prodCode, whName, ...orderedMovements.map((mv) => (row?.moves[mv] === undefined ? "" : fmt(row?.moves[mv] || 0)))];
-        lines.push(cells.map(csvEscape).join(","));
-      }
-    }
-    const csv = lines.join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    a.download = `productwise-report-${ts}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
 
   const movementOptions: Option[] = [
     { label: "Purchases", value: "purchase" },
@@ -452,14 +416,6 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
           className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
         >
           Create As of Report
-        </button>
-        <button
-          type="button"
-          onClick={downloadCsv}
-          disabled={!report}
-          className="inline-flex items-center rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-1 disabled:opacity-60"
-        >
-          Download CSV
         </button>
         <button
           type="button"
