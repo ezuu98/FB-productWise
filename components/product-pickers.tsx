@@ -480,7 +480,6 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               <style>
                 table { border-collapse: collapse; width: 100%; }
                 th, td { border: 1px solid #d1d5db; padding: 6px; font-family: Arial, sans-serif; font-size: 12px; text-align: center; }
-                th:first-child, td:first-child { text-align: left; }
                 thead th { background: #f9fafb; color: #374151; }
                 .title { background: #f3f4f6; font-weight: 600; font-size: 14px; text-align: left; }
                 tfoot td { background: #f9fafb; font-weight: 600; }
@@ -513,12 +512,12 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               const colCount = 1 + (hasAsOf ? 3 : 0) + mvs.length;
               html += `<table>`;
               html += `<thead>`;
-              html += `<tr class="title"><th colspan="${colCount}">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
+              html += `<tr class="title"><th colspan="${colCount}" style="text-align:left">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
               html += `<tr>`;
-              html += `<th>Warehouse</th>`;
+              html += `<th style="text-align:left">Warehouse</th>`;
               if (hasAsOf) html += `<th>Opening Stock</th>`;
               for (const mv of mvs) html += `<th>${htmlEscape(movementLabel(mv))}</th>`;
-              if (hasAsOf) html += `<th>Stock Adjustments</th><th>Total</th>`;
+              if (hasAsOf) html += `<th>Stock Adjustments</th><th>Closing Stock</th>`;
               html += `</tr>`;
               html += `</thead>`;
               html += `<tbody>`;
@@ -527,7 +526,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 const rowStd = rowsForProductStd.find((r) => String((r as any).warehouseId) === String(wid)) || null;
                 const rowAsOf = rowsForProductAsOf.find((r) => String((r as any).warehouseId) === String(wid)) || null;
                 html += `<tr>`;
-                html += `<td>${htmlEscape(whName)}</td>`;
+                html += `<td style="text-align:left">${htmlEscape(whName)}</td>`;
                 if (hasAsOf) html += `<td>${htmlEscape(fmt(rowAsOf?.opening ?? 0))}</td>`;
                 let __plus = 0, __minus = 0;
                 for (const mv of mvs) {
@@ -546,7 +545,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 html += `</tr>`;
               }
               html += `</tbody>`;
-              html += `<tfoot><tr><td>Totals</td>`;
+              html += `<tfoot><tr><td style="text-align:left">Totals</td>`;
               if (hasAsOf) html += `<td>${htmlEscape(fmt(openingTotal))}</td>`;
               for (const mv of mvs) html += `<td>${htmlEscape(fmt(productTotals[mv] || 0))}</td>`;
               if (hasAsOf) {
@@ -627,7 +626,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         {mvs.map((mv) => (
                           <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{movementLabel(mv)}</th>
                         ))}
-                        {showAsOf ? <><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Stock Adjustments</th><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Total</th></> : null}
+                        {showAsOf ? <><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Stock Adjustments</th><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Closing Stock</th></> : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
