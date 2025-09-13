@@ -157,6 +157,47 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   type ReportRow = { warehouseId: string; productId: string; moves: Record<string, number> };
   type Report = { rows: ReportRow[]; totals: Record<string, number> } | null;
   const [report, setReport] = useState<Report>(null);
+  const fmt = (value: unknown) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  };
+  const csvEscape = (v: unknown) => {
+    const s = String(v ?? "");
+    if (s.includes(",") || s.includes("\n") || s.includes("\r") || s.includes("\"")) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  };
+  const htmlEscape = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
+  const downloadCsv = () => {
+    if (!report) return;
+    const warehousesToUse = selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id));
+    const header = ["Product", "Category", "Code", "Warehouse", ...orderedMovements];
+    const lines: string[] = [header.map(csvEscape).join(",")];
+    for (const prod of selectedItems) {
+      const pid = String(prod.id);
+      const prodLabel = items.find((i) => i.id === prod.id)?.label || prod.id;
+      const prodCat = prod.category ?? "";
+      const prodCode = prod.code ?? "";
+      for (const wid of warehousesToUse) {
+        const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
+        const row = (report.rows || []).find((r) => String(r.productId) === pid && String(r.warehouseId) === String(wid)) || null;
+        const cells = [prodLabel, prodCat, prodCode, whName, ...orderedMovements.map((mv) => (row?.moves[mv] === undefined ? "" : fmt(row?.moves[mv] || 0)))];
+        lines.push(cells.map(csvEscape).join(","));
+      }
+    }
+    const csv = lines.join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const ts = new Date().toISOString().replace(/[:.]/g, "-");
+    a.download = `productwise-report-${ts}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const movementOptions: Option[] = [
     { label: "Purchases", value: "purchase" },
@@ -412,64 +453,158 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
         >
           Create As of Report
         </button>
+        <button
+          type="button"
+          onClick={downloadCsv}
+          disabled={!report}
+          className="inline-flex items-center rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-1 disabled:opacity-60"
+        >
+          Download CSV
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!report) return;
+            const warehousesToUse = selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id));
+            const style = `
+              <style>
+                table { border-collapse: collapse; width: 100%; }
+                th, td { border: 1px solid #d1d5db; padding: 6px; font-family: Arial, sans-serif; font-size: 12px; text-align: center; }
+                thead th { background: #f9fafb; color: #374151; }
+                .title { background: #f3f4f6; font-weight: 600; font-size: 14px; text-align: center; }
+                tfoot td { background: #f9fafb; font-weight: 600; }
+              </style>
+            `;
+            let html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>${style}</head><body>`;
+            html += `<h2 style="text-align:center;font-family:Arial,sans-serif;font-size:18px;font-weight:700;margin:0 0 8px 0;">${htmlEscape((fromDate || "—") + " to " + (toDate || "—"))}</h2>`;
+            for (const prod of selectedItems) {
+              const pid = String(prod.id);
+              const prodLabel = items.find((i) => i.id === prod.id)?.label || prod.id;
+              const prodCat = prod.category ?? "";
+              const prodCode = prod.code ?? "";
+              const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
+              const productTotals: Record<string, number> = {};
+              for (const r of rowsForProduct) {
+                for (const mv of orderedMovements) {
+                  productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
+                }
+              }
+              html += `<table>`;
+              html += `<thead>`;
+              html += `<tr class="title"><th colspan="${1 + orderedMovements.length}">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
+              html += `<tr>`;
+              html += `<th>Warehouse</th>`;
+              for (const mv of orderedMovements) html += `<th>${htmlEscape(mv)}</th>`;
+              html += `</tr>`;
+              html += `</thead>`;
+              html += `<tbody>`;
+              for (const wid of warehousesToUse) {
+                const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
+                const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
+                html += `<tr>`;
+                html += `<td>${htmlEscape(whName)}</td>`;
+                for (const mv of orderedMovements) {
+                  const val = row?.moves[mv];
+                  html += `<td>${val === undefined ? "" : htmlEscape(fmt(val))}</td>`;
+                }
+                html += `</tr>`;
+              }
+              html += `</tbody>`;
+              html += `<tfoot><tr><td>Totals</td>`;
+              for (const mv of orderedMovements) html += `<td>${htmlEscape(fmt(productTotals[mv] || 0))}</td>`;
+              html += `</tr></tfoot>`;
+              html += `</table><br/>`;
+            }
+            html += `</body></html>`;
+            const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const ts = new Date().toISOString().replace(/[:.]/g, "-");
+            a.download = `productwise-report-${ts}.xls`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}
+          disabled={!report}
+          className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-1 disabled:opacity-60"
+        >
+          Download Excel
+        </button>
       </div>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       {report && (
         <>
-          {selectedItems.length > 0 && (
-            <div className="mt-4">
-              <h3 className="text-sm font-semibold text-gray-800">Product</h3>
-              <p className="text-sm text-gray-900">
-                {(items.find((i) => i.id === selectedItems[0].id)?.label || selectedItems[0].id)}
-                {selectedItems[0].category ? ` — ${selectedItems[0].category}` : ""}
-                {selectedItems.length > 1 ? ` (+${selectedItems.length - 1} more)` : ""}
-              </p>
-            </div>
-          )}
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 border">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
-                {orderedMovements.map((mv) => (
-                  <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 bg-white">
-              {[...(report.rows || [])]
-                .sort((a, b) => {
-                  const wa = warehouses.find((w) => String(w.id) === String(a.warehouseId))?.display_name || a.warehouseId;
-                  const wb = warehouses.find((w) => String(w.id) === String(b.warehouseId))?.display_name || b.warehouseId;
-                  if (wa !== wb) return wa.localeCompare(wb);
-                  const pa = items.find((i) => String(i.id) === String(a.productId))?.label || a.productId;
-                  const pb = items.find((i) => String(i.id) === String(b.productId))?.label || b.productId;
-                  return pa.localeCompare(pb);
-                })
-                .map((r) => {
-                  const whName = warehouses.find((w) => String(w.id) === String(r.warehouseId))?.display_name || r.warehouseId;
-                  return (
-                    <tr key={`${r.warehouseId}-${r.productId}`}>
-                      <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
-                      {orderedMovements.map((mv) => (
-                        <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
-                      ))}
-                    </tr>
-                  );
-                })}
-            </tbody>
-            <tfoot className="bg-gray-50">
-              <tr>
-                <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
-                {orderedMovements.map((mv) => (
-                  <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{Number((report.totals || {})[mv] || 0)}</td>
-                ))}
-              </tr>
-            </tfoot>
-            </table>
+          <div className="mt-6">
+            <h2 className="text-2xl font-bold text-center text-gray-900">
+              {(fromDate || "—")} to {(toDate || "—")}
+            </h2>
           </div>
+          {selectedItems.map((prod) => {
+            const pid = String(prod.id);
+            const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
+            if (rowsForProduct.length === 0) return null;
+            const productTotals: Record<string, number> = {};
+            for (const r of rowsForProduct) {
+              for (const mv of orderedMovements) {
+                productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
+              }
+            }
+            return (
+              <div key={pid} className="mt-6">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 border">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th
+                          colSpan={1 + orderedMovements.length}
+                          className="px-4 py-2 text-center text-sm font-semibold text-gray-800"
+                        >
+                          {(items.find((i) => i.id === prod.id)?.label || prod.id)}
+                          {prod.category ? ` — ${prod.category}` : ""}
+                          {prod.code ? ` — ${prod.code}` : ""}
+                        </th>
+                      </tr>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Warehouse</th>
+                        {orderedMovements.map((mv) => (
+                          <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{mv}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {(selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id))).map((wid) => {
+                        const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
+                        const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
+                        return (
+                          <tr key={`${wid}-${pid}`}>
+                            <td className="px-4 py-2 text-sm text-gray-900 text-center">{whName}</td>
+                            {orderedMovements.map((mv) => {
+                              const val = row?.moves[mv];
+                              return (
+                                <td key={mv} className="px-4 py-2 text-sm text-gray-900 text-center">{val === undefined ? "" : fmt(val)}</td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot className="bg-gray-50">
+                      <tr>
+                        <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center" colSpan={1}>Totals</td>
+                        {orderedMovements.map((mv) => (
+                          <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(productTotals[mv] || 0)}</td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
         </>
       )}
     </div>

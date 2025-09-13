@@ -35,14 +35,14 @@ function nextUtcStart(dateStr?: string | null) {
 
 const MOVEMENT_ALIASES: Record<string, string[]> = {
   purchase: ["purchase", "purchases"],
-  sales: ["sales", "sale"],
-  sales_returns: ["sales_returns", "sales_return", "sale_return"],
+  sales: ["sales"],
+  sales_returns: ["sales_returns"],
   purchase_return: ["purchase_return", "purchase_returns"],
   manufacturing: ["manufacturing", "manufacture"],
   wastages: ["wastages", "wastage"],
   consumption: ["consumption", "consumptions"],
-  transfer_in: ["transfer_in", "transfer"],
-  transfer_out: ["transfer_in", "transfer_out"],
+  transfer_in: ["transfer_in"],
+  transfer_out: ["transfer_in"],
 };
 
 export async function POST(req: Request) {
@@ -75,10 +75,11 @@ export async function POST(req: Request) {
       while (true) {
         let query = supabase
           .from("stock_movements")
-          .select("product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
+          .select("id, product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
           .in("movement_type", MOVEMENT_ALIASES[mv] ?? [mv])
           .in("product_id", productIds)
           .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
           .range(offset, offset + pageSize - 1);
 
         if (warehouseIds?.length) {
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
           const productId = String(row.product_id);
           const key = `${warehouseId}|${productId}`;
           const rawQty = Number(row.quantity ?? 0);
-          const qty = mv === "sales_returns" ? Math.abs(rawQty) : rawQty;
+          const qty = Math.abs(rawQty);
 
           let agg = map.get(key);
           if (!agg) {
