@@ -353,6 +353,13 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
           selected={selectedWarehouses}
           onChange={setSelectedWarehouses}
         />
+        <ChipMultiSelect
+          id="move-multi"
+          label="Type of movement"
+          options={movementOptions}
+          selected={selectedMovements}
+          onChange={setSelectedMovements}
+        />
         <div>
           <label htmlFor="from-date" className="block text-sm font-medium text-gray-700">
             From date
@@ -377,13 +384,6 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
           />
         </div>
-        <ChipMultiSelect
-          id="move-multi"
-          label="Type of movement"
-          options={movementOptions}
-          selected={selectedMovements}
-          onChange={setSelectedMovements}
-        />
       </div>
       <div className="mt-6 flex items-center gap-3">
         <button
