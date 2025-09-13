@@ -199,6 +199,8 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     () => MOVEMENT_ORDER.map((k) => ({ value: k, label: MOVEMENT_LABELS[k] })),
     []
   );
+  const POSITIVE_MVS = new Set<MovementKey>(["purchase", "sales_returns", "transfer_in", "manufacturing"]);
+  const NEGATIVE_MVS = new Set<MovementKey>(["sales", "purchase_return", "wastages", "consumption", "transfer_out"]);
 
   const orderedMovements = useMemo(() => {
     return [...selectedMovements].sort((a, b) => MOVEMENT_ORDER.indexOf(a) - MOVEMENT_ORDER.indexOf(b));
@@ -508,7 +510,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                   for (const mv of mvs) productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
                 }
               }
-              const colCount = 1 + (hasAsOf ? 2 : 0) + mvs.length;
+              const colCount = 1 + (hasAsOf ? 3 : 0) + mvs.length;
               html += `<table>`;
               html += `<thead>`;
               html += `<tr class="title"><th colspan="${colCount}">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
@@ -516,7 +518,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               html += `<th>Warehouse</th>`;
               if (hasAsOf) html += `<th>Opening Stock</th>`;
               for (const mv of mvs) html += `<th>${htmlEscape(movementLabel(mv))}</th>`;
-              if (hasAsOf) html += `<th>Stock Adjustments</th>`;
+              if (hasAsOf) html += `<th>Stock Adjustments</th><th>Total</th>`;
               html += `</tr>`;
               html += `</thead>`;
               html += `<tbody>`;
@@ -527,18 +529,33 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 html += `<tr>`;
                 html += `<td>${htmlEscape(whName)}</td>`;
                 if (hasAsOf) html += `<td>${htmlEscape(fmt(rowAsOf?.opening ?? 0))}</td>`;
+                let __plus = 0, __minus = 0;
                 for (const mv of mvs) {
                   const val = (hasAsOf ? rowAsOf?.moves[mv] : rowStd?.moves[mv]);
-                  html += `<td>${val === undefined ? "" : htmlEscape(fmt(val))}</td>`;
+                  const num = Number(val || 0);
+                  if (["purchase","sales_returns","transfer_in","manufacturing"].includes(mv)) __plus += num; else if (["sales","purchase_return","wastages","consumption","transfer_out"].includes(mv)) __minus += num;
+                  html += `<td>${val === undefined ? "" : htmlEscape(fmt(num))}</td>`;
                 }
-                if (hasAsOf) html += `<td>${htmlEscape(fmt(rowAsOf?.adjustments ?? 0))}</td>`;
+                if (hasAsOf) {
+                  const __adj = Number(rowAsOf?.adjustments ?? 0);
+                  const __open = Number(rowAsOf?.opening ?? 0);
+                  html += `<td>${htmlEscape(fmt(__adj))}</td>`;
+                  const __total = __open + __plus + __adj - __minus;
+                  html += `<td>${htmlEscape(fmt(__total))}</td>`;
+                }
                 html += `</tr>`;
               }
               html += `</tbody>`;
               html += `<tfoot><tr><td>Totals</td>`;
               if (hasAsOf) html += `<td>${htmlEscape(fmt(openingTotal))}</td>`;
               for (const mv of mvs) html += `<td>${htmlEscape(fmt(productTotals[mv] || 0))}</td>`;
-              if (hasAsOf) html += `<td>${htmlEscape(fmt(adjustmentsTotal))}</td>`;
+              if (hasAsOf) {
+                html += `<td>${htmlEscape(fmt(adjustmentsTotal))}</td>`;
+                const __plusFooter = Number(productTotals["purchase"]||0) + Number(productTotals["sales_returns"]||0) + Number(productTotals["transfer_in"]||0) + Number(productTotals["manufacturing"]||0);
+                const __minusFooter = Number(productTotals["sales"]||0) + Number(productTotals["purchase_return"]||0) + Number(productTotals["wastages"]||0) + Number(productTotals["consumption"]||0) + Number(productTotals["transfer_out"]||0);
+                const __footerTotal = openingTotal + __plusFooter + adjustmentsTotal - __minusFooter;
+                html += `<td>${htmlEscape(fmt(__footerTotal))}</td>`;
+              }
               html += `</tr></tfoot>`;
               html += `</table><br/>`;
             }
@@ -610,7 +627,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         {mvs.map((mv) => (
                           <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{movementLabel(mv)}</th>
                         ))}
-                        {showAsOf ? <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Stock Adjustments</th> : null}
+                        {showAsOf ? <><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Stock Adjustments</th><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Total</th></> : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
@@ -631,7 +648,21 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                               );
                             })}
                             {showAsOf ? (
-                              <td className="px-4 py-2 text-sm text-gray-900 text-center">{fmt((rowAsOf as any)?.adjustments ?? 0)}</td>
+                              <>
+                                <td className="px-4 py-2 text-sm text-gray-900 text-center">{fmt((rowAsOf as any)?.adjustments ?? 0)}</td>
+                                {(() => {
+                                  const values = mvs.map((mv) => Number((rowAsOf as any)?.moves[mv] || 0));
+                                  let plus = 0, minus = 0;
+                                  mvs.forEach((mv, i) => {
+                                    const num = values[i];
+                                    if (POSITIVE_MVS.has(mv as MovementKey)) plus += num; else if (NEGATIVE_MVS.has(mv as MovementKey)) minus += num;
+                                  });
+                                  const open = Number((rowAsOf as any)?.opening ?? 0);
+                                  const adj = Number((rowAsOf as any)?.adjustments ?? 0);
+                                  const total = open + plus + adj - minus;
+                                  return <td className="px-4 py-2 text-sm text-gray-900 text-center">{fmt(total)}</td>;
+                                })()}
+                              </>
                             ) : null}
                           </tr>
                         );
@@ -647,7 +678,15 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                           <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(productTotals[mv] || 0)}</td>
                         ))}
                         {showAsOf ? (
-                          <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(adjustmentsTotal)}</td>
+                          <>
+                            <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(adjustmentsTotal)}</td>
+                            {(() => {
+                              const plusFooter = (productTotals["purchase"]||0) + (productTotals["sales_returns"]||0) + (productTotals["transfer_in"]||0) + (productTotals["manufacturing"]||0);
+                              const minusFooter = (productTotals["sales"]||0) + (productTotals["purchase_return"]||0) + (productTotals["wastages"]||0) + (productTotals["consumption"]||0) + (productTotals["transfer_out"]||0);
+                              const footerTotal = openingTotal + plusFooter + adjustmentsTotal - minusFooter;
+                              return <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(footerTotal)}</td>;
+                            })()}
+                          </>
                         ) : null}
                       </tr>
                     </tfoot>
