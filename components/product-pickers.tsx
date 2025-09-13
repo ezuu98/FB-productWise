@@ -162,18 +162,12 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     return Number.isFinite(n) ? n.toFixed(2) : "0.00";
   };
   const htmlEscape = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
-
-  const movementOptions: Option[] = [
-    { label: "Purchases", value: "purchase" },
-    { label: "Purchase Returns", value: "purchase_return" },
-    { label: "Sales", value: "sales" },
-    { label: "Sales Returns", value: "sales_returns" },
-    { label: "Transfer In", value: "transfer_in" },
-    { label: "Transfer Out", value: "transfer_out" },
-    { label: "Wastages", value: "wastages" },
-    { label: "Manufacturings", value: "manufacturing" },
-    { label: "Consumption", value: "consumption" },
-  ];
+  const movementLabel = (k: string) => {
+    const pretty = k.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    // MOVEMENT_LABELS will override when available
+    // @ts-ignore - type will be enforced where used
+    return (MOVEMENT_LABELS as Record<string, string>)[k] ?? pretty;
+  };
 
   const MOVEMENT_ORDER = [
     "purchase",
@@ -185,7 +179,23 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     "wastages",
     "manufacturing",
     "consumption",
-  ];
+  ] as const;
+  type MovementKey = typeof MOVEMENT_ORDER[number];
+  const MOVEMENT_LABELS: Record<MovementKey, string> = {
+    purchase: "Purchases",
+    purchase_return: "Purchase Returns",
+    sales: "Sales",
+    sales_returns: "Sales Returns",
+    transfer_in: "Transfer In",
+    transfer_out: "Transfer Out",
+    wastages: "Wastages",
+    manufacturing: "Manufacturing",
+    consumption: "Consumption",
+  };
+  const movementOptions: Option[] = useMemo(
+    () => MOVEMENT_ORDER.map((k) => ({ value: k, label: MOVEMENT_LABELS[k] })),
+    []
+  );
 
   const orderedMovements = useMemo(() => {
     return [...selectedMovements].sort((a, b) => MOVEMENT_ORDER.indexOf(a) - MOVEMENT_ORDER.indexOf(b));
@@ -427,7 +437,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               html += `<tr class="title"><th colspan="${1 + orderedMovements.length}">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
               html += `<tr>`;
               html += `<th>Warehouse</th>`;
-              for (const mv of orderedMovements) html += `<th>${htmlEscape(mv)}</th>`;
+              for (const mv of orderedMovements) html += `<th>${htmlEscape(movementLabel(mv))}</th>`;
               html += `</tr>`;
               html += `</thead>`;
               html += `<tbody>`;
@@ -499,7 +509,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                       <tr className="bg-gray-50">
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
                         {orderedMovements.map((mv) => (
-                          <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{mv}</th>
+                          <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{movementLabel(mv)}</th>
                         ))}
                       </tr>
                     </thead>
