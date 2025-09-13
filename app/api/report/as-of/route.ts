@@ -1,0 +1,262 @@
+import { NextResponse } from "next/server";
+import { createServiceSupabase } from "@/lib/supabase/server";
+
+function pickWarehouseColumn(movement: string): "warehouse_id" | "warehouse_dest_id" {
+  switch (movement) {
+    case "purchase":
+    case "manufacturing":
+    case "transfer_in":
+      return "warehouse_dest_id";
+    case "transfer_out":
+      return "warehouse_id";
+    case "sales":
+    case "sales_returns":
+    case "purchase_return":
+    case "wastages":
+    case "consumption":
+      return "warehouse_id";
+    default:
+      return "warehouse_id";
+  }
+}
+
+function toUtcStart(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+function nextUtcStart(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString();
+}
+
+const MOVEMENT_ALIASES: Record<string, string[]> = {
+  purchase: ["purchase", "purchases"],
+  sales: ["sales"],
+  sales_returns: ["sales_returns"],
+  purchase_return: ["purchase_return", "purchase_returns"],
+  manufacturing: ["manufacturing", "manufacture"],
+  wastages: ["wastages", "wastage"],
+  consumption: ["consumption", "consumptions"],
+  transfer_in: ["transfer_in"],
+  transfer_out: ["transfer_out"],
+};
+
+export async function POST(req: Request) {
+  try {
+    const { productIds, warehouseIds, fromDate, toDate, movements } = await req.json();
+
+    if (!Array.isArray(productIds) || productIds.length === 0)
+      return NextResponse.json({ error: "Select at least one product" }, { status: 400 });
+    if (!Array.isArray(warehouseIds) || warehouseIds.length === 0)
+      return NextResponse.json({ error: "Select at least one warehouse" }, { status: 400 });
+
+    const supabase = createServiceSupabase();
+
+    type RowAgg = {
+      warehouseId: string;
+      productId: string;
+      opening: number;
+      adjustments: number;
+      moves: Record<string, number>;
+    };
+    const map = new Map<string, RowAgg>();
+    const totals: Record<string, number> = {};
+
+    const startISO = toUtcStart(fromDate || null);
+    const endISO = nextUtcStart(toDate || null);
+
+    // 1) Opening stock from warehouse_inventory (wh_id, product_id, quantity)
+    {
+      const pageSize = 1000;
+      let offset = 0;
+      while (true) {
+        const { data, error } = await supabase
+          .from("warehouse_inventory")
+          .select("wh_id, product_id, quantity")
+          .in("product_id", productIds)
+          .in("wh_id", warehouseIds)
+          .order("product_id", { ascending: true })
+          .order("wh_id", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        for (const row of data ?? []) {
+          const warehouseId = String(row.wh_id);
+          const productId = String(row.product_id);
+          const key = `${warehouseId}|${productId}`;
+          const opening = Number(row.quantity || 0);
+          let agg = map.get(key);
+          if (!agg) {
+            agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
+            map.set(key, agg);
+          }
+          agg.opening += opening;
+          totals.opening = (totals.opening ?? 0) + opening;
+        }
+        if (!data || data.length < pageSize) break;
+        offset += pageSize;
+        if (offset > 500000) break; // safety cap
+      }
+    }
+
+    // 2) Movements details (use provided movements or default list)
+    const movementList: string[] = Array.isArray(movements) && movements.length
+      ? movements
+      : [
+          "purchase",
+          "purchase_return",
+          "sales",
+          "sales_returns",
+          "transfer_in",
+          "transfer_out",
+          "wastages",
+          "manufacturing",
+          "consumption",
+        ];
+
+    for (const mv of movementList) {
+      const col = pickWarehouseColumn(mv);
+      const pageSize = 1000;
+      let offset = 0;
+      while (true) {
+        let query = supabase
+          .from("stock_movements")
+          .select("id, product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
+          .in("movement_type", MOVEMENT_ALIASES[mv] ?? [mv])
+          .in("product_id", productIds)
+          .order("created_at", { ascending: true })
+          .order("id", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (warehouseIds?.length) {
+          // @ts-ignore dynamic column name
+          query = query.in(col as any, warehouseIds);
+        }
+        if (startISO) query = query.gte("created_at", startISO);
+        if (endISO) query = query.lt("created_at", endISO);
+        const { data, error } = await query;
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        for (const row of data ?? []) {
+          const warehouseId = String(row[col as keyof typeof row]);
+          const productId = String(row.product_id);
+          const key = `${warehouseId}|${productId}`;
+          const qty = Math.abs(Number(row.quantity ?? 0));
+          let agg = map.get(key);
+          if (!agg) {
+            agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
+            map.set(key, agg);
+          }
+          agg.moves[mv] = (agg.moves[mv] ?? 0) + qty;
+          totals[mv] = (totals[mv] ?? 0) + qty;
+        }
+        if (!data || data.length < pageSize) break;
+        offset += pageSize;
+        if (offset > 500000) break;
+      }
+    }
+
+    // 3) Stock adjustments from stock_corrections (product_id, warehouse_id(uuid), variance_quantity)
+    {
+      // Map numeric warehouse ids -> uuid warehouse_id
+      let { data: wrows, error: werr } = await supabase
+        .from("warehouses")
+        .select("id, warehouse_id")
+        .in("id", warehouseIds);
+      if (werr || !wrows || wrows.length === 0) {
+        const fb = await supabase
+          .from("warehouse")
+          .select("id, warehouse_id")
+          .in("id", warehouseIds);
+        wrows = fb.data ?? [];
+      }
+      const idToUuid = new Map<string, string>();
+      const uuidToId = new Map<string, string>();
+      for (const w of wrows ?? []) {
+        const id = String(w.id);
+        const uuid = String((w as any).warehouse_id ?? "");
+        if (uuid) {
+          idToUuid.set(id, uuid);
+          uuidToId.set(uuid, id);
+        }
+      }
+      const uuidList = Array.from(idToUuid.values());
+      if (uuidList.length) {
+        const pageSize = 1000;
+        let offset = 0;
+        while (true) {
+          // Try primary: stock_corrections with correction_date and variance_quantity
+          let query1 = supabase
+            .from("stock_corrections")
+            .select("product_id, warehouse_id, variance_quantity, correction_date")
+            .in("product_id", productIds)
+            .in("warehouse_id", uuidList)
+            .order("correction_date", { ascending: true })
+            .range(offset, offset + pageSize - 1);
+          if (fromDate) query1 = query1.gte("correction_date", fromDate);
+          if (toDate) query1 = query1.lte("correction_date", toDate);
+          let { data, error } = await query1;
+
+          // Fallback A: same table but created_at instead of correction_date
+          if (error) {
+            let queryA = supabase
+              .from("stock_corrections")
+              .select("product_id, warehouse_id, variance_quantity, created_at")
+              .in("product_id", productIds)
+              .in("warehouse_id", uuidList)
+              .order("created_at", { ascending: true })
+              .range(offset, offset + pageSize - 1);
+            if (startISO) queryA = queryA.gte("created_at", startISO);
+            if (endISO) queryA = queryA.lt("created_at", endISO);
+            const resA = await queryA;
+            data = resA.data as any;
+            error = resA.error as any;
+          }
+
+          // Fallback B: singular table name
+          if (error) {
+            let queryB = supabase
+              .from("stock_correction")
+              .select("product_id, warehouse_id, variance_quantity, correction_date")
+              .in("product_id", productIds)
+              .in("warehouse_id", uuidList)
+              .order("correction_date", { ascending: true })
+              .range(offset, offset + pageSize - 1);
+            if (fromDate) queryB = queryB.gte("correction_date", fromDate);
+            if (toDate) queryB = queryB.lte("correction_date", toDate);
+            const resB = await queryB;
+            data = resB.data as any;
+            error = resB.error as any;
+          }
+
+          if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+          for (const row of (data as any[]) ?? []) {
+            const warehouseUuid = String((row as any).warehouse_id);
+            const warehouseId = uuidToId.get(warehouseUuid) || warehouseUuid; // fallback to uuid
+            const productId = String((row as any).product_id);
+            const key = `${warehouseId}|${productId}`;
+            const qty = Number((row as any).variance_quantity ?? (row as any).variance ?? (row as any).variance_qty ?? 0);
+            let agg = map.get(key);
+            if (!agg) {
+              agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
+              map.set(key, agg);
+            }
+            agg.adjustments = (agg.adjustments ?? 0) + qty;
+            totals.adjustments = (totals.adjustments ?? 0) + qty;
+          }
+          if (!data || (data as any[]).length < pageSize) break;
+          offset += pageSize;
+          if (offset > 500000) break;
+        }
+      }
+    }
+
+    const rows = Array.from(map.values());
+
+    return NextResponse.json({ rows, totals });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
+  }
+}
