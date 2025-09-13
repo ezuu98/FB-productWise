@@ -56,7 +56,7 @@ async function fetchCategories(
 ) {
   const unique = Array.from(new Set(ids.filter((v) => v !== null && v !== undefined)));
   const chunkSize = 500;
-  const map = new Map<string | number, string>();
+  const map = new Map<string, string>();
 
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
@@ -65,7 +65,7 @@ async function fetchCategories(
       .select("categ_id, complete_name")
       .in("categ_id", chunk as any);
     if (error) break;
-    data?.forEach((row: any) => map.set(row.categ_id, row.complete_name));
+    data?.forEach((row: any) => map.set(String(row.categ_id), row.complete_name));
   }
 
   return map;
@@ -82,7 +82,7 @@ export default async function ProductWiseDetailsPage() {
     id: String(p.id ?? productLabel(p) ?? productCode(p) ?? Math.random()),
     label: productLabel(p),
     code: productCode(p),
-    category: categoryMap.get(p.category_id) ?? null,
+    category: categoryMap.get(String(p.category_id)) ?? null,
   }));
 
   return (
