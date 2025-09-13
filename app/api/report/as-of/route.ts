@@ -41,13 +41,23 @@ const MOVEMENT_ALIASES: Record<string, string[]> = {
   manufacturing: ["manufacturing", "manufacture"],
   wastages: ["wastages", "wastage"],
   consumption: ["consumption", "consumptions"],
+  // Backend uses 'transfer_in' for both directions; map accordingly
   transfer_in: ["transfer_in"],
-  transfer_out: ["transfer_out"],
+  transfer_out: ["transfer_in"],
 };
 
 export async function POST(req: Request) {
   try {
     const { productIds, warehouseIds, fromDate, toDate, movements } = await req.json();
+
+    // Defaults: from 2025-06-30 to today if not provided
+    const today = new Date();
+    const y = today.getUTCFullYear();
+    const m = String(today.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(today.getUTCDate()).padStart(2, "0");
+    const defFrom = "2025-06-30";
+    const useFromDate = fromDate || defFrom;
+    const useToDate = toDate || `${y}-${m}-${d}`;
 
     if (!Array.isArray(productIds) || productIds.length === 0)
       return NextResponse.json({ error: "Select at least one product" }, { status: 400 });
@@ -66,8 +76,8 @@ export async function POST(req: Request) {
     const map = new Map<string, RowAgg>();
     const totals: Record<string, number> = {};
 
-    const startISO = toUtcStart(fromDate || null);
-    const endISO = nextUtcStart(toDate || null);
+    const startISO = toUtcStart(useFromDate || null);
+    const endISO = nextUtcStart(useToDate || null);
 
     // 1) Opening stock from warehouse_inventory (wh_id, product_id, quantity)
     {
@@ -213,8 +223,8 @@ export async function POST(req: Request) {
             .in("warehouse_id", uuidList)
             .order("correction_date", { ascending: true })
             .range(offset, offset + pageSize - 1);
-          if (fromDate) query1 = query1.gte("correction_date", fromDate);
-          if (toDate) query1 = query1.lte("correction_date", toDate);
+          if (useFromDate) query1 = query1.gte("correction_date", useFromDate);
+          if (useToDate) query1 = query1.lte("correction_date", useToDate);
           let { data, error } = await query1;
 
           // Fallback A: same table but created_at instead of correction_date
@@ -242,8 +252,8 @@ export async function POST(req: Request) {
               .in("warehouse_id", uuidList)
               .order("correction_date", { ascending: true })
               .range(offset, offset + pageSize - 1);
-            if (fromDate) queryB = queryB.gte("correction_date", fromDate);
-            if (toDate) queryB = queryB.lte("correction_date", toDate);
+            if (useFromDate) queryB = queryB.gte("correction_date", useFromDate);
+            if (useToDate) queryB = queryB.lte("correction_date", useToDate);
             const resB = await queryB;
             data = resB.data as any;
             error = resB.error as any;
