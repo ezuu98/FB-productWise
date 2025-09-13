@@ -32,6 +32,16 @@ function ChipMultiSelect({
     () => selected.map((v) => options.find((o) => o.value === v)).filter(Boolean) as Option[],
     [selected, options]
   );
+  const allSelected = options.length > 0 && selectedSet.size === options.length;
+  const someSelected = selectedSet.size > 0 && selectedSet.size < options.length;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      onChange([]);
+    } else {
+      onChange(options.map((o) => o.value));
+    }
+  };
 
   const toggle = (val: string) => {
     if (selectedSet.has(val)) {
@@ -70,17 +80,25 @@ function ChipMultiSelect({
               className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-800"
             >
               {opt.label}
-              <button
-                type="button"
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={(e) => {
                   e.stopPropagation();
                   remove(opt.value);
                 }}
-                className="ml-1 rounded-full p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    remove(opt.value);
+                  }
+                }}
+                className="ml-1 rounded-full p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700 cursor-pointer"
                 aria-label={`Remove ${opt.label}`}
               >
                 ×
-              </button>
+              </span>
             </span>
           ))
         )}
@@ -93,6 +111,18 @@ function ChipMultiSelect({
           aria-multiselectable
           onMouseDown={(e) => e.preventDefault()}
         >
+          <li>
+            <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                aria-checked={someSelected ? "mixed" : allSelected}
+                onChange={toggleAll}
+                className="h-4 w-4 rounded border-gray-300 text-gray-700 focus:ring-gray-400"
+              />
+              <span className="text-gray-800">Select all</span>
+            </label>
+          </li>
           {options.map((opt) => (
             <li key={opt.value}>
               <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
@@ -122,17 +152,39 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedMovements, setSelectedMovements] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  type ReportRow = { warehouseId: string; productId: string; moves: Record<string, number> };
+  type Report = { rows: ReportRow[]; totals: Record<string, number> } | null;
+  const [report, setReport] = useState<Report>(null);
 
   const movementOptions: Option[] = [
     { label: "Purchases", value: "purchase" },
     { label: "Purchase Returns", value: "purchase_return" },
     { label: "Sales", value: "sales" },
     { label: "Sales Returns", value: "sales_returns" },
-    { label: "Transfers", value: "transfer_in" },
-    { label: "Manufacturings", value: "manufacturing" },
+    { label: "Transfer In", value: "transfer_in" },
+    { label: "Transfer Out", value: "transfer_out" },
     { label: "Wastages", value: "wastages" },
-    { label: "Consumptions", value: "consumptions" },
+    { label: "Manufacturings", value: "manufacturing" },
+    { label: "Consumption", value: "consumption" },
   ];
+
+  const MOVEMENT_ORDER = [
+    "purchase",
+    "purchase_return",
+    "sales",
+    "sales_returns",
+    "transfer_in",
+    "transfer_out",
+    "wastages",
+    "manufacturing",
+    "consumption",
+  ];
+
+  const orderedMovements = useMemo(() => {
+    return [...selectedMovements].sort((a, b) => MOVEMENT_ORDER.indexOf(a) - MOVEMENT_ORDER.indexOf(b));
+  }, [selectedMovements]);
 
   const warehouseOptions: Option[] = useMemo(
     () => warehouses.map((w) => ({ value: String(w.id), label: w.display_name })),
@@ -321,17 +373,105 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
       <div className="mt-6 flex items-center gap-3">
         <button
           type="button"
-          className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
+          onClick={async () => {
+            setLoading(true);
+            setError(null);
+            setReport(null);
+            try {
+              if (selected.length === 0) throw new Error("Select at least one product");
+              if (selectedWarehouses.length === 0) throw new Error("Select at least one warehouse");
+              if (selectedMovements.length === 0) throw new Error("Select at least one movement type");
+              const res = await fetch("/api/report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  productIds: selected.map((v) => (Number(v) || v)),
+                  warehouseIds: selectedWarehouses.map((v) => (Number(v) || v)),
+                  movements: selectedMovements,
+                  fromDate: fromDate || null,
+                  toDate: toDate || null,
+                }),
+              });
+              const json = await res.json();
+              if (!res.ok) throw new Error(json.error || "Failed to create report");
+              setReport({ rows: json.rows || [], totals: json.totals || {} });
+            } catch (e: any) {
+              setError(e?.message || "Something went wrong");
+            } finally {
+              setLoading(false);
+            }
+          }}
+          disabled={loading}
+          className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1 disabled:opacity-60"
         >
-          Create Report
+          {loading ? "Creating..." : "Create Report"}
         </button>
         <button
           type="button"
-          className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium text-[rgb(37_99_235)] border-[rgb(37_99_235)] bg-white hover:bg-[rgba(37,99,235,0.08)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
+          className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
         >
           Create As of Report
         </button>
       </div>
+
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+      {report && (
+        <>
+          {selectedItems.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold text-gray-800">Product</h3>
+              <p className="text-sm text-gray-900">
+                {(items.find((i) => i.id === selectedItems[0].id)?.label || selectedItems[0].id)}
+                {selectedItems[0].category ? ` — ${selectedItems[0].category}` : ""}
+                {selectedItems.length > 1 ? ` (+${selectedItems.length - 1} more)` : ""}
+              </p>
+            </div>
+          )}
+          <div className="mt-6 overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 border">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
+                {orderedMovements.map((mv) => (
+                  <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {[...(report.rows || [])]
+                .sort((a, b) => {
+                  const wa = warehouses.find((w) => String(w.id) === String(a.warehouseId))?.display_name || a.warehouseId;
+                  const wb = warehouses.find((w) => String(w.id) === String(b.warehouseId))?.display_name || b.warehouseId;
+                  if (wa !== wb) return wa.localeCompare(wb);
+                  const pa = items.find((i) => String(i.id) === String(a.productId))?.label || a.productId;
+                  const pb = items.find((i) => String(i.id) === String(b.productId))?.label || b.productId;
+                  return pa.localeCompare(pb);
+                })
+                .map((r) => {
+                  const whName = warehouses.find((w) => String(w.id) === String(r.warehouseId))?.display_name || r.warehouseId;
+                  return (
+                    <tr key={`${r.warehouseId}-${r.productId}`}>
+                      <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
+                      {orderedMovements.map((mv) => (
+                        <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
+            </tbody>
+            <tfoot className="bg-gray-50">
+              <tr>
+                <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
+                {orderedMovements.map((mv) => (
+                  <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{Number((report.totals || {})[mv] || 0)}</td>
+                ))}
+              </tr>
+            </tfoot>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
