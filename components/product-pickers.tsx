@@ -168,6 +168,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     }
     return s;
   };
+  const htmlEscape = (v: unknown) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;");
   const downloadCsv = () => {
     if (!report) return;
     const warehousesToUse = selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id));
@@ -459,6 +460,76 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
           className="inline-flex items-center rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-1 disabled:opacity-60"
         >
           Download CSV
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (!report) return;
+            const warehousesToUse = selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id));
+            const style = `
+              <style>
+                table { border-collapse: collapse; width: 100%; }
+                th, td { border: 1px solid #d1d5db; padding: 6px; font-family: Arial, sans-serif; font-size: 12px; }
+                thead th { background: #f9fafb; color: #374151; }
+                .title { background: #f3f4f6; font-weight: 600; font-size: 14px; }
+                tfoot td { background: #f9fafb; font-weight: 600; }
+              </style>
+            `;
+            let html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>${style}</head><body>`;
+            for (const prod of selectedItems) {
+              const pid = String(prod.id);
+              const prodLabel = items.find((i) => i.id === prod.id)?.label || prod.id;
+              const prodCat = prod.category ?? "";
+              const prodCode = prod.code ?? "";
+              const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
+              const productTotals: Record<string, number> = {};
+              for (const r of rowsForProduct) {
+                for (const mv of orderedMovements) {
+                  productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
+                }
+              }
+              html += `<table>`;
+              html += `<thead>`;
+              html += `<tr class="title"><th colspan="${1 + orderedMovements.length}">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
+              html += `<tr>`;
+              html += `<th>Warehouse</th>`;
+              for (const mv of orderedMovements) html += `<th>${htmlEscape(mv)}</th>`;
+              html += `</tr>`;
+              html += `</thead>`;
+              html += `<tbody>`;
+              for (const wid of warehousesToUse) {
+                const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
+                const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
+                html += `<tr>`;
+                html += `<td>${htmlEscape(whName)}</td>`;
+                for (const mv of orderedMovements) {
+                  const val = row?.moves[mv];
+                  html += `<td>${val === undefined ? "" : htmlEscape(fmt(val))}</td>`;
+                }
+                html += `</tr>`;
+              }
+              html += `</tbody>`;
+              html += `<tfoot><tr><td>Totals</td>`;
+              for (const mv of orderedMovements) html += `<td>${htmlEscape(fmt(productTotals[mv] || 0))}</td>`;
+              html += `</tr></tfoot>`;
+              html += `</table><br/>`;
+            }
+            html += `</body></html>`;
+            const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            const ts = new Date().toISOString().replace(/[:.]/g, "-");
+            a.download = `productwise-report-${ts}.xls`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}
+          disabled={!report}
+          className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-1 disabled:opacity-60"
+        >
+          Download Excel
         </button>
       </div>
 
