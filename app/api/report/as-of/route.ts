@@ -42,7 +42,7 @@ const MOVEMENT_ALIASES: Record<string, string[]> = {
   wastages: ["wastages", "wastage"],
   consumption: ["consumption", "consumptions"],
   transfer_in: ["transfer_in"],
-  transfer_out: ["transfer_in"],
+  transfer_out: ["transfer_out"],
 };
 
 export async function POST(req: Request) {
@@ -188,13 +188,13 @@ export async function POST(req: Request) {
         while (true) {
           let query = supabase
             .from("stock_corrections")
-            .select("product_id, warehouse_id, variance_quantity, created_at")
+            .select("product_id, warehouse_id, variance_quantity, correction_date")
             .in("product_id", productIds)
             .in("warehouse_id", uuidList)
-            .order("created_at", { ascending: true })
+            .order("correction_date", { ascending: true })
             .range(offset, offset + pageSize - 1);
-          if (startISO) query = query.gte("created_at", startISO);
-          if (endISO) query = query.lt("created_at", endISO);
+          if (startISO) query = query.gte("correction_date", startISO);
+          if (endISO) query = query.lt("correction_date", endISO);
           const { data, error } = await query;
           if (error) return NextResponse.json({ error: error.message }, { status: 500 });
           for (const row of data ?? []) {
