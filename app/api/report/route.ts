@@ -4,11 +4,11 @@ import { createServiceSupabase } from "@/lib/supabase/server";
 function pickWarehouseColumn(movement: string): "warehouse_id" | "warehouse_dest_id" {
   switch (movement) {
     case "purchase":
-    case "sales_returns":
     case "manufacturing":
     case "transfer_in":
       return "warehouse_dest_id";
     case "sales":
+    case "sales_returns":
     case "purchase_return":
     case "wastages":
     case "consumption":
