@@ -157,6 +157,9 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   type ReportRow = { warehouseId: string; productId: string; moves: Record<string, number> };
   type Report = { rows: ReportRow[]; totals: Record<string, number> } | null;
   const [report, setReport] = useState<Report>(null);
+  type AsOfRow = { warehouseId: string; productId: string; opening: number; adjustments: number; moves: Record<string, number> };
+  type AsOfReport = { rows: AsOfRow[]; totals: Record<string, number> } | null;
+  const [asOfReport, setAsOfReport] = useState<AsOfReport>(null);
   const fmt = (value: unknown) => {
     const n = Number(value);
     return Number.isFinite(n) ? n.toFixed(2) : "0.00";
@@ -431,14 +434,44 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
         </button>
         <button
           type="button"
+          onClick={async () => {
+            setLoading(true);
+            setError(null);
+            setReport(null);
+            setAsOfReport(null);
+            try {
+              if (selected.length === 0) throw new Error("Select at least one product");
+              if (selectedWarehouses.length === 0) throw new Error("Select at least one warehouse");
+              const res = await fetch("/api/report/as-of", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  productIds: selected.map((v) => (Number(v) || v)),
+                  warehouseIds: selectedWarehouses.map((v) => (Number(v) || v)),
+                  movements: MOVEMENT_ORDER,
+                  fromDate: fromDate || null,
+                  toDate: toDate || null,
+                }),
+              });
+              const json = await res.json();
+              if (!res.ok) throw new Error(json.error || "Failed to create as-of report");
+              setAsOfReport({ rows: json.rows || [], totals: json.totals || {} });
+            } catch (e: any) {
+              setError(e?.message || "Something went wrong");
+            } finally {
+              setLoading(false);
+            }
+          }}
           className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
         >
-          Create As of Report
+          {loading ? "Creating..." : "Create As of Report"}
         </button>
         <button
           type="button"
           onClick={() => {
-            if (!report) return;
+            const hasStd = !!report;
+            const hasAsOf = !!asOfReport;
+            if (!hasStd && !hasAsOf) return;
             const warehousesToUse = selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id));
             const style = `
               <style>
@@ -457,36 +490,54 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               const prodLabel = items.find((i) => i.id === prod.id)?.label || prod.id;
               const prodCat = prod.category ?? "";
               const prodCode = prod.code ?? "";
-              const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
+              const rowsForProductStd = hasStd ? (report!.rows || []).filter((r) => String(r.productId) === pid) : [];
+              const rowsForProductAsOf = hasAsOf ? (asOfReport!.rows || []).filter((r) => String(r.productId) === pid) : [];
+              const mvs = hasAsOf ? Array.from(MOVEMENT_ORDER) : orderedMovements;
               const productTotals: Record<string, number> = {};
-              for (const r of rowsForProduct) {
-                for (const mv of orderedMovements) {
-                  productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
+              let openingTotal = 0;
+              let adjustmentsTotal = 0;
+              if (hasAsOf) {
+                for (const r of rowsForProductAsOf) {
+                  openingTotal += Number(r.opening || 0);
+                  adjustmentsTotal += Number(r.adjustments || 0);
+                  for (const mv of mvs) productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
+                }
+              } else {
+                for (const r of rowsForProductStd) {
+                  for (const mv of mvs) productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
                 }
               }
+              const colCount = 1 + (hasAsOf ? 2 : 0) + mvs.length;
               html += `<table>`;
               html += `<thead>`;
-              html += `<tr class="title"><th colspan="${1 + orderedMovements.length}">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
+              html += `<tr class="title"><th colspan="${colCount}">${htmlEscape(prodLabel)}${prodCat ? ` — ${htmlEscape(prodCat)}` : ""}${prodCode ? ` — ${htmlEscape(prodCode)}` : ""}</th></tr>`;
               html += `<tr>`;
               html += `<th>Warehouse</th>`;
-              for (const mv of orderedMovements) html += `<th>${htmlEscape(movementLabel(mv))}</th>`;
+              if (hasAsOf) html += `<th>Opening Stock</th>`;
+              for (const mv of mvs) html += `<th>${htmlEscape(movementLabel(mv))}</th>`;
+              if (hasAsOf) html += `<th>Stock Adjustments</th>`;
               html += `</tr>`;
               html += `</thead>`;
               html += `<tbody>`;
               for (const wid of warehousesToUse) {
                 const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
-                const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
+                const rowStd = rowsForProductStd.find((r) => String((r as any).warehouseId) === String(wid)) || null;
+                const rowAsOf = rowsForProductAsOf.find((r) => String((r as any).warehouseId) === String(wid)) || null;
                 html += `<tr>`;
                 html += `<td>${htmlEscape(whName)}</td>`;
-                for (const mv of orderedMovements) {
-                  const val = row?.moves[mv];
+                if (hasAsOf) html += `<td>${htmlEscape(fmt(rowAsOf?.opening ?? 0))}</td>`;
+                for (const mv of mvs) {
+                  const val = (hasAsOf ? rowAsOf?.moves[mv] : rowStd?.moves[mv]);
                   html += `<td>${val === undefined ? "" : htmlEscape(fmt(val))}</td>`;
                 }
+                if (hasAsOf) html += `<td>${htmlEscape(fmt(rowAsOf?.adjustments ?? 0))}</td>`;
                 html += `</tr>`;
               }
               html += `</tbody>`;
               html += `<tfoot><tr><td>Totals</td>`;
-              for (const mv of orderedMovements) html += `<td>${htmlEscape(fmt(productTotals[mv] || 0))}</td>`;
+              if (hasAsOf) html += `<td>${htmlEscape(fmt(openingTotal))}</td>`;
+              for (const mv of mvs) html += `<td>${htmlEscape(fmt(productTotals[mv] || 0))}</td>`;
+              if (hasAsOf) html += `<td>${htmlEscape(fmt(adjustmentsTotal))}</td>`;
               html += `</tr></tfoot>`;
               html += `</table><br/>`;
             }
@@ -502,7 +553,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
           }}
-          disabled={!report}
+          disabled={!report && !asOfReport}
           className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:ring-offset-1 disabled:opacity-60"
         >
           Download Excel
@@ -511,16 +562,30 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      {report && (
+      {(report || asOfReport) && (
         <>
           {selectedItems.map((prod) => {
             const pid = String(prod.id);
-            const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
-            if (rowsForProduct.length === 0) return null;
+            const rowsForProductStd = report ? (report.rows || []).filter((r) => String(r.productId) === pid) : [];
+            const rowsForProductAsOf = asOfReport ? (asOfReport.rows || []).filter((r) => String(r.productId) === pid) : [];
+            const showAsOf = rowsForProductAsOf.length > 0 || (!!asOfReport && rowsForProductStd.length === 0);
+            const mvs = showAsOf ? Array.from(MOVEMENT_ORDER) : orderedMovements;
             const productTotals: Record<string, number> = {};
-            for (const r of rowsForProduct) {
-              for (const mv of orderedMovements) {
-                productTotals[mv] = (productTotals[mv] ?? 0) + Number(r.moves[mv] || 0);
+            let openingTotal = 0;
+            let adjustmentsTotal = 0;
+            if (showAsOf) {
+              for (const r of rowsForProductAsOf) {
+                openingTotal += Number((r as any).opening || 0);
+                adjustmentsTotal += Number((r as any).adjustments || 0);
+                for (const mv of mvs) {
+                  productTotals[mv] = (productTotals[mv] ?? 0) + Number((r as any).moves[mv] || 0);
+                }
+              }
+            } else {
+              for (const r of rowsForProductStd) {
+                for (const mv of mvs) {
+                  productTotals[mv] = (productTotals[mv] ?? 0) + Number((r as any).moves[mv] || 0);
+                }
               }
             }
             return (
@@ -530,7 +595,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                     <thead>
                       <tr className="bg-gray-100">
                         <th
-                          colSpan={1 + orderedMovements.length}
+                          colSpan={1 + (showAsOf ? 2 : 0) + mvs.length}
                           className="px-4 py-2 text-left text-sm font-semibold text-gray-800"
                         >
                           {(items.find((i) => i.id === prod.id)?.label || prod.id)}
@@ -540,24 +605,33 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                       </tr>
                       <tr className="bg-gray-50">
                         <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
-                        {orderedMovements.map((mv) => (
+                        {showAsOf ? <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Opening Stock</th> : null}
+                        {mvs.map((mv) => (
                           <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{movementLabel(mv)}</th>
                         ))}
+                        {showAsOf ? <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Stock Adjustments</th> : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
                       {(selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id))).map((wid) => {
                         const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
-                        const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
+                        const rowStd = rowsForProductStd.find((r) => String((r as any).warehouseId) === String(wid)) || null;
+                        const rowAsOf = rowsForProductAsOf.find((r) => String((r as any).warehouseId) === String(wid)) || null;
                         return (
                           <tr key={`${wid}-${pid}`}>
                             <td className="px-4 py-2 text-sm text-gray-900 text-left">{whName}</td>
-                            {orderedMovements.map((mv) => {
-                              const val = row?.moves[mv];
+                            {showAsOf ? (
+                              <td className="px-4 py-2 text-sm text-gray-900 text-center">{fmt((rowAsOf as any)?.opening ?? 0)}</td>
+                            ) : null}
+                            {mvs.map((mv) => {
+                              const val = showAsOf ? (rowAsOf as any)?.moves[mv] : (rowStd as any)?.moves[mv];
                               return (
                                 <td key={mv} className="px-4 py-2 text-sm text-gray-900 text-center">{val === undefined ? "" : fmt(val)}</td>
                               );
                             })}
+                            {showAsOf ? (
+                              <td className="px-4 py-2 text-sm text-gray-900 text-center">{fmt((rowAsOf as any)?.adjustments ?? 0)}</td>
+                            ) : null}
                           </tr>
                         );
                       })}
@@ -565,9 +639,15 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                     <tfoot className="bg-gray-50">
                       <tr>
                         <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-left" colSpan={1}>Totals</td>
-                        {orderedMovements.map((mv) => (
+                        {showAsOf ? (
+                          <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(openingTotal)}</td>
+                        ) : null}
+                        {mvs.map((mv) => (
                           <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(productTotals[mv] || 0)}</td>
                         ))}
+                        {showAsOf ? (
+                          <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(adjustmentsTotal)}</td>
+                        ) : null}
                       </tr>
                     </tfoot>
                   </table>
