@@ -318,6 +318,20 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
           onChange={setSelectedMovements}
         />
       </div>
+      <div className="mt-6 flex items-center gap-3">
+        <button
+          type="button"
+          className="inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none"
+        >
+          Create Report
+        </button>
+        <button
+          type="button"
+          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+        >
+          Create As of Report
+        </button>
+      </div>
     </div>
   );
 }
