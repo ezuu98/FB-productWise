@@ -56,31 +56,20 @@ async function fetchCategories(
 ) {
   const unique = Array.from(new Set(ids.filter((v) => v !== null && v !== undefined)));
   const chunkSize = 500;
-  const map = new Map<string, string>();
+  const map = new Map<number, string>();
 
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
     const numbers = chunk
       .map((v) => (typeof v === "number" ? v : Number(v)))
       .filter((v) => Number.isFinite(v));
-    const strings = chunk.map((v) => String(v));
 
-    // Try numeric match first
     if (numbers.length) {
       const { data } = await supabase
         .from("categories")
         .select("categ_id, complete_name")
         .in("categ_id", numbers as any);
-      data?.forEach((row: any) => map.set(String(row.categ_id), row.complete_name));
-    }
-
-    // Also try string match in case the column is text
-    if (strings.length) {
-      const { data } = await supabase
-        .from("categories")
-        .select("categ_id, complete_name")
-        .in("categ_id", strings as any);
-      data?.forEach((row: any) => map.set(String(row.categ_id), row.complete_name));
+      data?.forEach((row: any) => map.set(row.categ_id as number, row.complete_name as string));
     }
   }
 
@@ -99,7 +88,7 @@ export default async function ProductWiseDetailsPage() {
     label: productLabel(p),
     code: productCode(p),
     category:
-      categoryMap.get(String(p.category_id)) ??
+      categoryMap.get(Number(p.category_id)) ??
       p.complete_name ??
       p.category_name ??
       p.category ??
