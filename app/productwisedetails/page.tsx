@@ -60,12 +60,28 @@ async function fetchCategories(
 
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
-    const { data, error } = await supabase
-      .from("categories")
-      .select("categ_id, complete_name")
-      .in("categ_id", chunk as any);
-    if (error) break;
-    data?.forEach((row: any) => map.set(String(row.categ_id), row.complete_name));
+    const numbers = chunk
+      .map((v) => (typeof v === "number" ? v : Number(v)))
+      .filter((v) => Number.isFinite(v));
+    const strings = chunk.map((v) => String(v));
+
+    // Try numeric match first
+    if (numbers.length) {
+      const { data } = await supabase
+        .from("categories")
+        .select("categ_id, complete_name")
+        .in("categ_id", numbers as any);
+      data?.forEach((row: any) => map.set(String(row.categ_id), row.complete_name));
+    }
+
+    // Also try string match in case the column is text
+    if (strings.length) {
+      const { data } = await supabase
+        .from("categories")
+        .select("categ_id, complete_name")
+        .in("categ_id", strings as any);
+      data?.forEach((row: any) => map.set(String(row.categ_id), row.complete_name));
+    }
   }
 
   return map;
@@ -82,7 +98,14 @@ export default async function ProductWiseDetailsPage() {
     id: String(p.id ?? productLabel(p) ?? productCode(p) ?? Math.random()),
     label: productLabel(p),
     code: productCode(p),
-    category: categoryMap.get(String(p.category_id)) ?? null,
+    category:
+      categoryMap.get(String(p.category_id)) ??
+      p.complete_name ??
+      p.category_name ??
+      p.category ??
+      p.categ_name ??
+      p.category_full_name ??
+      null,
   }));
 
   return (
