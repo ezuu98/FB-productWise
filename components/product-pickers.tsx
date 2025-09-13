@@ -455,23 +455,21 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white">
-                        {[...rowsForProduct]
-                          .sort((a, b) => {
-                            const wa = warehouses.find((w) => String(w.id) === String(a.warehouseId))?.display_name || a.warehouseId;
-                            const wb = warehouses.find((w) => String(w.id) === String(b.warehouseId))?.display_name || b.warehouseId;
-                            return wa.localeCompare(wb);
-                          })
-                          .map((r) => {
-                            const whName = warehouses.find((w) => String(w.id) === String(r.warehouseId))?.display_name || r.warehouseId;
-                            return (
-                              <tr key={`${r.warehouseId}-${r.productId}`}>
-                                <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
-                                {orderedMovements.map((mv) => (
-                                  <td key={mv} className="px-4 py-2 text-sm text-gray-900">{fmt(r.moves[mv] || 0)}</td>
-                                ))}
-                              </tr>
-                            );
-                          })}
+                        {selectedWarehouses.map((wid) => {
+                        const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
+                        const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
+                        return (
+                          <tr key={`${wid}-${pid}`}>
+                            <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
+                            {orderedMovements.map((mv) => {
+                              const val = row?.moves[mv];
+                              return (
+                                <td key={mv} className="px-4 py-2 text-sm text-gray-900">{val === undefined ? "" : fmt(val)}</td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
                       </tbody>
                       <tfoot className="bg-gray-50">
                         <tr>
