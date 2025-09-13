@@ -451,7 +451,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               </style>
             `;
             let html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>${style}</head><body>`;
-            html += `<h2 style="text-align:center;font-family:Arial,sans-serif;font-size:18px;font-weight:700;margin:0 0 8px 0;">${htmlEscape((fromDate || "—") + " to " + (toDate || "—"))}</h2>`;
+            html += `<div style="text-align:left;font-family:Arial,sans-serif;font-size:12px;margin:0 0 8px 0;"><div><strong>From:</strong> ${htmlEscape(fromDate || "—")}</div><div><strong>To:</strong> ${htmlEscape(toDate || "—")}</div></div>`;
             for (const prod of selectedItems) {
               const pid = String(prod.id);
               const prodLabel = items.find((i) => i.id === prod.id)?.label || prod.id;
