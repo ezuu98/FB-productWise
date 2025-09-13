@@ -455,7 +455,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 bg-white">
-                        {selectedWarehouses.map((wid) => {
+                        {(selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id))).map((wid) => {
                         const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
                         const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
                         return (
