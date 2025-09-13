@@ -157,6 +157,10 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   type ReportRow = { warehouseId: string; productId: string; moves: Record<string, number> };
   type Report = { rows: ReportRow[]; totals: Record<string, number> } | null;
   const [report, setReport] = useState<Report>(null);
+  const fmt = (value: unknown) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+  };
 
   const movementOptions: Option[] = [
     { label: "Purchases", value: "purchase" },
@@ -463,7 +467,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                               <tr key={`${r.warehouseId}-${r.productId}`}>
                                 <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
                                 {orderedMovements.map((mv) => (
-                                  <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
+                                  <td key={mv} className="px-4 py-2 text-sm text-gray-900">{fmt(r.moves[mv] || 0)}</td>
                                 ))}
                               </tr>
                             );
@@ -473,7 +477,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         <tr>
                           <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
                           {orderedMovements.map((mv) => (
-                            <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{Number(productTotals[mv] || 0)}</td>
+                            <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{fmt(productTotals[mv] || 0)}</td>
                           ))}
                         </tr>
                       </tfoot>
