@@ -364,6 +364,40 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
           Create As of Report
         </button>
       </div>
+
+      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+
+      {report && (
+        <div className="mt-6 overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 border">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
+                {selectedMovements.map((mv) => (
+                  <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
+                ))}
+                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Total</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 bg-white">
+              {selectedWarehouses.map((wid) => {
+                const name = warehouses.find((w) => String(w.id) === String(wid))?.display_name || wid;
+                const row = (report as any)[String(wid)] || {};
+                const total = selectedMovements.reduce((s, mv) => s + Number(row[mv] || 0), 0);
+                return (
+                  <tr key={wid}>
+                    <td className="px-4 py-2 text-sm text-gray-900">{name}</td>
+                    {selectedMovements.map((mv) => (
+                      <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(row[mv] || 0)}</td>
+                    ))}
+                    <td className="px-4 py-2 text-sm font-semibold text-gray-900">{total}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
