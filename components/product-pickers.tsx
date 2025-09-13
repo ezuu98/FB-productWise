@@ -51,8 +51,8 @@ export default function ProductPickers({ items }: Props) {
   const namePoolIds = new Set(namePool.map((i) => i.id));
   const codePoolIds = new Set(codePool.map((i) => i.id));
 
-  const showNameDropdown = (isNameOpen || qName.trim().length > 0) && namePool.length > 0;
-  const showCodeDropdown = (isCodeOpen || qCode.trim().length > 0) && codePool.length > 0;
+  const showNameDropdown = isNameOpen && namePool.length > 0;
+  const showCodeDropdown = isCodeOpen && codePool.length > 0;
 
   return (
     <div className="w-full">
