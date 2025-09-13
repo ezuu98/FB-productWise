@@ -403,6 +403,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             setLoading(true);
             setError(null);
             setReport(null);
+            setAsOfReport(null);
             try {
               if (selected.length === 0) throw new Error("Select at least one product");
               if (selectedWarehouses.length === 0) throw new Error("Select at least one warehouse");
