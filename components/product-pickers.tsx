@@ -324,9 +324,38 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
       <div className="mt-6 flex items-center gap-3">
         <button
           type="button"
-          className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
+          onClick={async () => {
+            setLoading(true);
+            setError(null);
+            setReport(null);
+            try {
+              if (selected.length === 0) throw new Error("Select at least one product");
+              if (selectedWarehouses.length === 0) throw new Error("Select at least one warehouse");
+              if (selectedMovements.length === 0) throw new Error("Select at least one movement type");
+              const res = await fetch("/api/report", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  productIds: selected.map((v) => (Number(v) || v)),
+                  warehouseIds: selectedWarehouses.map((v) => (Number(v) || v)),
+                  movements: selectedMovements,
+                  fromDate: fromDate || null,
+                  toDate: toDate || null,
+                }),
+              });
+              const json = await res.json();
+              if (!res.ok) throw new Error(json.error || "Failed to create report");
+              setReport(json.byWarehouse || {});
+            } catch (e: any) {
+              setError(e?.message || "Something went wrong");
+            } finally {
+              setLoading(false);
+            }
+          }}
+          disabled={loading}
+          className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1 disabled:opacity-60"
         >
-          Create Report
+          {loading ? "Creating..." : "Create Report"}
         </button>
         <button
           type="button"
