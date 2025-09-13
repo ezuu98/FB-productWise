@@ -434,28 +434,28 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             }
             return (
               <div key={pid} className="mt-6">
-                <div className="flex items-stretch gap-4">
-                  <div className="flex w-12 sm:w-16 md:w-20 flex-shrink-0 rounded-md border bg-gray-50">
-                    <span
-                      className="m-auto text-xs sm:text-sm font-medium text-gray-700 select-none"
-                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-                    >
-                      {(items.find((i) => i.id === prod.id)?.label || prod.id)}
-                      {prod.category ? ` — ${prod.category}` : ""}
-                    </span>
-                  </div>
-                  <div className="flex-1 overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 border">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
-                          {orderedMovements.map((mv) => (
-                            <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {(selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id))).map((wid) => {
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 border">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th
+                          colSpan={1 + orderedMovements.length}
+                          className="px-4 py-2 text-left text-sm font-semibold text-gray-800"
+                        >
+                          {(items.find((i) => i.id === prod.id)?.label || prod.id)}
+                          {prod.category ? ` — ${prod.category}` : ""}
+                          {prod.code ? ` — ${prod.code}` : ""}
+                        </th>
+                      </tr>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
+                        {orderedMovements.map((mv) => (
+                          <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {(selectedWarehouses.length ? selectedWarehouses : warehouses.map((w) => String(w.id))).map((wid) => {
                         const whName = warehouses.find((w) => String(w.id) === String(wid))?.display_name || String(wid);
                         const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
                         return (
@@ -470,17 +470,16 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                           </tr>
                         );
                       })}
-                      </tbody>
-                      <tfoot className="bg-gray-50">
-                        <tr>
-                          <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
-                          {orderedMovements.map((mv) => (
-                            <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{fmt(productTotals[mv] || 0)}</td>
-                          ))}
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                    </tbody>
+                    <tfoot className="bg-gray-50">
+                      <tr>
+                        <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
+                        {orderedMovements.map((mv) => (
+                          <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{fmt(productTotals[mv] || 0)}</td>
+                        ))}
+                      </tr>
+                    </tfoot>
+                  </table>
                 </div>
               </div>
             );
