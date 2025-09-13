@@ -70,17 +70,25 @@ function ChipMultiSelect({
               className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-800"
             >
               {opt.label}
-              <button
-                type="button"
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={(e) => {
                   e.stopPropagation();
                   remove(opt.value);
                 }}
-                className="ml-1 rounded-full p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    remove(opt.value);
+                  }
+                }}
+                className="ml-1 rounded-full p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700 cursor-pointer"
                 aria-label={`Remove ${opt.label}`}
               >
                 ×
-              </button>
+              </span>
             </span>
           ))
         )}
