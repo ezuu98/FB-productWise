@@ -280,7 +280,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 const isSel = selectedSet.has(it.id);
                 return (
                   <option key={it.id} value={it.id}>
-                    {`${isSel ? "● " : ""}${it.label}`}
+                    {`${it.label}${isSel ? " ●" : ""}`}
                   </option>
                 );
               })}
@@ -319,7 +319,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 const label = `${it.code ? `${it.code} — ` : ""}${it.label}`;
                 return (
                   <option key={it.id} value={it.id}>
-                    {`${isSel ? "● " : ""}${label}`}
+                    {`${label}${isSel ? " ●" : ""}`}
                   </option>
                 );
               })}
