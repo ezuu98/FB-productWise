@@ -452,6 +452,14 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
         >
           Create As of Report
         </button>
+        <button
+          type="button"
+          onClick={downloadCsv}
+          disabled={!report}
+          className="inline-flex items-center rounded-md bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-800 focus:ring-offset-1 disabled:opacity-60"
+        >
+          Download CSV
+        </button>
       </div>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
