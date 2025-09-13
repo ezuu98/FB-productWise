@@ -348,7 +348,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               });
               const json = await res.json();
               if (!res.ok) throw new Error(json.error || "Failed to create report");
-              setReport(json.byWarehouse || {});
+              setReport({ rows: json.rows || [], totals: json.totals || {} });
             } catch (e: any) {
               setError(e?.message || "Something went wrong");
             } finally {
