@@ -469,13 +469,14 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             const style = `
               <style>
                 table { border-collapse: collapse; width: 100%; }
-                th, td { border: 1px solid #d1d5db; padding: 6px; font-family: Arial, sans-serif; font-size: 12px; }
+                th, td { border: 1px solid #d1d5db; padding: 6px; font-family: Arial, sans-serif; font-size: 12px; text-align: center; }
                 thead th { background: #f9fafb; color: #374151; }
-                .title { background: #f3f4f6; font-weight: 600; font-size: 14px; }
+                .title { background: #f3f4f6; font-weight: 600; font-size: 14px; text-align: center; }
                 tfoot td { background: #f9fafb; font-weight: 600; }
               </style>
             `;
             let html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>${style}</head><body>`;
+            html += `<h2 style="text-align:center;font-family:Arial,sans-serif;font-size:18px;font-weight:700;margin:0 0 8px 0;">${htmlEscape((fromDate || "—") + " to " + (toDate || "—"))}</h2>`;
             for (const prod of selectedItems) {
               const pid = String(prod.id);
               const prodLabel = items.find((i) => i.id === prod.id)?.label || prod.id;
@@ -537,6 +538,11 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
 
       {report && (
         <>
+          <div className="mt-6">
+            <h2 className="text-2xl font-bold text-center text-gray-900">
+              {(fromDate || "—")} to {(toDate || "—")}
+            </h2>
+          </div>
           {selectedItems.map((prod) => {
             const pid = String(prod.id);
             const rowsForProduct = (report.rows || []).filter((r) => String(r.productId) === pid);
@@ -555,7 +561,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                       <tr className="bg-gray-100">
                         <th
                           colSpan={1 + orderedMovements.length}
-                          className="px-4 py-2 text-left text-sm font-semibold text-gray-800"
+                          className="px-4 py-2 text-center text-sm font-semibold text-gray-800"
                         >
                           {(items.find((i) => i.id === prod.id)?.label || prod.id)}
                           {prod.category ? ` — ${prod.category}` : ""}
@@ -563,9 +569,9 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         </th>
                       </tr>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
+                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Warehouse</th>
                         {orderedMovements.map((mv) => (
-                          <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
+                          <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{mv}</th>
                         ))}
                       </tr>
                     </thead>
@@ -575,11 +581,11 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
                         return (
                           <tr key={`${wid}-${pid}`}>
-                            <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
+                            <td className="px-4 py-2 text-sm text-gray-900 text-center">{whName}</td>
                             {orderedMovements.map((mv) => {
                               const val = row?.moves[mv];
                               return (
-                                <td key={mv} className="px-4 py-2 text-sm text-gray-900">{val === undefined ? "" : fmt(val)}</td>
+                                <td key={mv} className="px-4 py-2 text-sm text-gray-900 text-center">{val === undefined ? "" : fmt(val)}</td>
                               );
                             })}
                           </tr>
@@ -588,9 +594,9 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                     </tbody>
                     <tfoot className="bg-gray-50">
                       <tr>
-                        <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
+                        <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center" colSpan={1}>Totals</td>
                         {orderedMovements.map((mv) => (
-                          <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{fmt(productTotals[mv] || 0)}</td>
+                          <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(productTotals[mv] || 0)}</td>
                         ))}
                       </tr>
                     </tfoot>
