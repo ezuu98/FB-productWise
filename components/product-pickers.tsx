@@ -417,8 +417,19 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
       {report && (
-        <div className="mt-6 overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 border">
+        <>
+          {selectedItems.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-semibold text-gray-800">Product</h3>
+              <p className="text-sm text-gray-900">
+                {(items.find((i) => i.id === selectedItems[0].id)?.label || selectedItems[0].id)}
+                {selectedItems[0].category ? ` — ${selectedItems[0].category}` : ""}
+                {selectedItems.length > 1 ? ` (+${selectedItems.length - 1} more)` : ""}
+              </p>
+            </div>
+          )}
+          <div className="mt-6 overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 border">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
@@ -439,22 +450,13 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 })
                 .map((r) => {
                   const whName = warehouses.find((w) => String(w.id) === String(r.warehouseId))?.display_name || r.warehouseId;
-                  const prod = items.find((i) => String(i.id) === String(r.productId));
-                  const heading = `${prod?.label || r.productId}${prod?.category ? ` — ${prod.category}` : ""}`;
                   return (
-                    <>
-                      <tr key={`${r.warehouseId}-${r.productId}-h`}>
-                        <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1 + orderedMovements.length}>
-                          {heading}
-                        </td>
-                      </tr>
-                      <tr key={`${r.warehouseId}-${r.productId}`}>
-                        <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
-                        {orderedMovements.map((mv) => (
-                          <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
-                        ))}
-                      </tr>
-                    </>
+                    <tr key={`${r.warehouseId}-${r.productId}`}>
+                      <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
+                      {orderedMovements.map((mv) => (
+                        <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
+                      ))}
+                    </tr>
                   );
                 })}
             </tbody>
@@ -466,8 +468,9 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 ))}
               </tr>
             </tfoot>
-          </table>
-        </div>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
