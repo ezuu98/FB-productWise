@@ -20,6 +20,18 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [selectedMovements, setSelectedMovements] = useState<string[]>([]);
+
+  const movementOptions = [
+    { label: "Purchases", value: "purchase" },
+    { label: "Purchase Returns", value: "purchase_return" },
+    { label: "Sales", value: "sales" },
+    { label: "Sales Returns", value: "sales_returns" },
+    { label: "Transfers", value: "transfer_in" },
+    { label: "manufacturings", value: "manufacturing" },
+    { label: "wastages", value: "wastages" },
+    { label: "Consumptions", value: "consumptions" },
+  ];
 
   const norm = (s: string) => s.normalize("NFKD").toLowerCase();
 
@@ -160,7 +172,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
           </ul>
         )}
       </div>
-      <div className="mt-6 grid gap-6 sm:grid-cols-3">
+      <div className="mt-6 grid gap-6 sm:grid-cols-4">
         <div>
           <label htmlFor="wh-multi" className="block text-sm font-medium text-gray-700">
             Warehouses
@@ -205,6 +217,27 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             onChange={(e) => setToDate(e.target.value)}
             className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
           />
+        </div>
+        <div>
+          <label htmlFor="move-multi" className="block text-sm font-medium text-gray-700">
+            Type of movement
+          </label>
+          <select
+            id="move-multi"
+            multiple
+            size={Math.min(8, Math.max(4, movementOptions.length))}
+            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
+            value={selectedMovements}
+            onChange={(e) =>
+              setSelectedMovements(Array.from(e.currentTarget.selectedOptions).map((o) => o.value))
+            }
+          >
+            {movementOptions.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </div>
