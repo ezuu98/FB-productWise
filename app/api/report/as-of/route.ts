@@ -160,22 +160,41 @@ export async function POST(req: Request) {
     // 3) Stock adjustments from stock_corrections (product_id, warehouse_id(uuid), variance_quantity)
     {
       // Map numeric warehouse ids -> uuid warehouse_id
-      let { data: wrows, error: werr } = await supabase
-        .from("warehouses")
-        .select("id, warehouse_id")
-        .in("id", warehouseIds);
-      if (werr || !wrows || wrows.length === 0) {
-        const fb = await supabase
-          .from("warehouse")
-          .select("id, warehouse_id")
+      // Fetch warehouse UUIDs robustly: prefer warehouses.uuid, fallback to other common fields
+      let wrows: any[] = [];
+      {
+        let res = await supabase
+          .from("warehouses")
+          .select("id, uuid")
           .in("id", warehouseIds);
-        wrows = fb.data ?? [];
+        if (res.error) {
+          // Try wide select to detect available uuid-like fields
+          res = await supabase
+            .from("warehouses")
+            .select("id, *")
+            .in("id", warehouseIds);
+        }
+        if (res.error || !res.data || res.data.length === 0) {
+          let res2 = await supabase
+            .from("warehouse")
+            .select("id, uuid")
+            .in("id", warehouseIds);
+          if (res2.error) {
+            res2 = await supabase
+              .from("warehouse")
+              .select("id, *")
+              .in("id", warehouseIds);
+          }
+          wrows = res2.data ?? [];
+        } else {
+          wrows = res.data ?? [];
+        }
       }
       const idToUuid = new Map<string, string>();
       const uuidToId = new Map<string, string>();
       for (const w of wrows ?? []) {
         const id = String(w.id);
-        const uuid = String((w as any).warehouse_id ?? "");
+        const uuid = String(((w as any).uuid ?? (w as any).warehouse_id ?? (w as any).warehouse_uuid ?? ""));
         if (uuid) {
           idToUuid.set(id, uuid);
           uuidToId.set(uuid, id);
