@@ -238,6 +238,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   const selectedItems = selected
     .map((id) => items.find((i) => i.id === id))
     .filter(Boolean) as Item[];
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const namePoolIds = new Set(namePool.map((i) => i.id));
   const codePoolIds = new Set(codePool.map((i) => i.id));
@@ -275,11 +276,14 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               value={selected.filter((id) => namePoolIds.has(id))}
               onChange={onNameChange}
             >
-              {namePool.map((it) => (
-                <option key={it.id} value={it.id}>
-                  {it.label}
-                </option>
-              ))}
+              {namePool.map((it) => {
+                const isSel = selectedSet.has(it.id);
+                return (
+                  <option key={it.id} value={it.id}>
+                    {`${isSel ? "● " : ""}${it.label}`}
+                  </option>
+                );
+              })}
             </select>
           ) : null}
         </div>
@@ -310,11 +314,15 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               value={selected.filter((id) => codePoolIds.has(id))}
               onChange={onCodeChange}
             >
-              {codePool.map((it) => (
-                <option key={it.id} value={it.id}>
-                  {(it.code ? `${it.code} — ` : "") + it.label}
-                </option>
-              ))}
+              {codePool.map((it) => {
+                const isSel = selectedSet.has(it.id);
+                const label = `${it.code ? `${it.code} — ` : ""}${it.label}`;
+                return (
+                  <option key={it.id} value={it.id}>
+                    {`${isSel ? "● " : ""}${label}`}
+                  </option>
+                );
+              })}
             </select>
           ) : null}
         </div>
