@@ -143,10 +143,26 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     { label: "Sales Returns", value: "sales_returns" },
     { label: "Transfer In", value: "transfer_in" },
     { label: "Transfer Out", value: "transfer_out" },
-    { label: "Manufacturings", value: "manufacturing" },
     { label: "Wastages", value: "wastages" },
+    { label: "Manufacturings", value: "manufacturing" },
     { label: "Consumption", value: "consumption" },
   ];
+
+  const MOVEMENT_ORDER = [
+    "purchase",
+    "purchase_return",
+    "sales",
+    "sales_returns",
+    "transfer_in",
+    "transfer_out",
+    "wastages",
+    "manufacturing",
+    "consumption",
+  ];
+
+  const orderedMovements = useMemo(() => {
+    return [...selectedMovements].sort((a, b) => MOVEMENT_ORDER.indexOf(a) - MOVEMENT_ORDER.indexOf(b));
+  }, [selectedMovements]);
 
   const warehouseOptions: Option[] = useMemo(
     () => warehouses.map((w) => ({ value: String(w.id), label: w.display_name })),
@@ -384,9 +400,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Product</th>
-                <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Category</th>
-                {selectedMovements.map((mv) => (
+                {orderedMovements.map((mv) => (
                   <th key={mv} className="px-4 py-2 text-left text-xs font-medium text-gray-700">{mv}</th>
                 ))}
               </tr>
@@ -404,22 +418,28 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                 .map((r) => {
                   const whName = warehouses.find((w) => String(w.id) === String(r.warehouseId))?.display_name || r.warehouseId;
                   const prod = items.find((i) => String(i.id) === String(r.productId));
+                  const heading = `${prod?.label || r.productId}${prod?.category ? ` — ${prod.category}` : ""}`;
                   return (
-                    <tr key={`${r.warehouseId}-${r.productId}`}>
-                      <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900">{prod?.label || r.productId}</td>
-                      <td className="px-4 py-2 text-sm text-gray-900">{prod?.category || ""}</td>
-                      {selectedMovements.map((mv) => (
-                        <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
-                      ))}
-                    </tr>
+                    <>
+                      <tr key={`${r.warehouseId}-${r.productId}-h`}>
+                        <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1 + orderedMovements.length}>
+                          {heading}
+                        </td>
+                      </tr>
+                      <tr key={`${r.warehouseId}-${r.productId}`}>
+                        <td className="px-4 py-2 text-sm text-gray-900">{whName}</td>
+                        {orderedMovements.map((mv) => (
+                          <td key={mv} className="px-4 py-2 text-sm text-gray-900">{Number(r.moves[mv] || 0)}</td>
+                        ))}
+                      </tr>
+                    </>
                   );
                 })}
             </tbody>
             <tfoot className="bg-gray-50">
               <tr>
-                <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={3}>Totals</td>
-                {selectedMovements.map((mv) => (
+                <td className="px-4 py-2 text-sm font-semibold text-gray-900" colSpan={1}>Totals</td>
+                {orderedMovements.map((mv) => (
                   <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900">{Number((report.totals || {})[mv] || 0)}</td>
                 ))}
               </tr>
