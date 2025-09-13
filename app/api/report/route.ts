@@ -46,9 +46,9 @@ export async function POST(req: Request) {
 
     const byWarehouse: Record<string, Record<string, number>> = {};
 
-    // Normalize date range to UTC day boundaries
-    const startISO = toUtcStart(fromDate || toDate || null);
-    const endISO = nextUtcStart(toDate || fromDate || null);
+    // Normalize date range to UTC day boundaries using provided values only
+    const startISO = toUtcStart(fromDate || null);
+    const endISO = nextUtcStart(toDate || null);
 
     for (const mv of movements as string[]) {
       const col = pickWarehouseColumn(mv);
