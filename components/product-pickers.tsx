@@ -402,6 +402,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               <style>
                 table { border-collapse: collapse; width: 100%; }
                 th, td { border: 1px solid #d1d5db; padding: 6px; font-family: Arial, sans-serif; font-size: 12px; text-align: center; }
+                th:first-child, td:first-child { text-align: left; }
                 thead th { background: #f9fafb; color: #374151; }
                 .title { background: #f3f4f6; font-weight: 600; font-size: 14px; text-align: center; }
                 tfoot td { background: #f9fafb; font-weight: 600; }
@@ -496,7 +497,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         </th>
                       </tr>
                       <tr className="bg-gray-50">
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Warehouse</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">Warehouse</th>
                         {orderedMovements.map((mv) => (
                           <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{mv}</th>
                         ))}
@@ -508,7 +509,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         const row = rowsForProduct.find((r) => String(r.warehouseId) === String(wid)) || null;
                         return (
                           <tr key={`${wid}-${pid}`}>
-                            <td className="px-4 py-2 text-sm text-gray-900 text-center">{whName}</td>
+                            <td className="px-4 py-2 text-sm text-gray-900 text-left">{whName}</td>
                             {orderedMovements.map((mv) => {
                               const val = row?.moves[mv];
                               return (
@@ -521,7 +522,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                     </tbody>
                     <tfoot className="bg-gray-50">
                       <tr>
-                        <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-center" colSpan={1}>Totals</td>
+                        <td className="px-4 py-2 text-sm font-semibold text-gray-900 text-left" colSpan={1}>Totals</td>
                         {orderedMovements.map((mv) => (
                           <td key={mv} className="px-4 py-2 text-sm font-semibold text-gray-900 text-center">{fmt(productTotals[mv] || 0)}</td>
                         ))}
