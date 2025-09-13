@@ -108,7 +108,7 @@ export default async function ProductWiseDetailsPage() {
   const categoryMap = await fetchCategories(supabase, categoryIds);
 
   const items = (products ?? []).map((p: any) => ({
-    id: String(p.id ?? productLabel(p) ?? productCode(p) ?? Math.random()),
+    id: String(p.odoo_id ?? p.id ?? productLabel(p) ?? productCode(p) ?? Math.random()),
     label: productLabel(p),
     code: productCode(p),
     category:
