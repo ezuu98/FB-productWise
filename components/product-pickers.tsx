@@ -321,13 +321,13 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
       <div className="mt-6 flex items-center gap-3">
         <button
           type="button"
-          className="inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 focus:outline-none"
+          className="inline-flex items-center rounded-md bg-[rgb(37_99_235)] px-4 py-2 text-sm font-medium text-white hover:bg-[rgb(29_78_216)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
         >
           Create Report
         </button>
         <button
           type="button"
-          className="inline-flex items-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
+          className="inline-flex items-center rounded-md border px-4 py-2 text-sm font-medium text-[rgb(37_99_235)] border-[rgb(37_99_235)] bg-white hover:bg-[rgba(37,99,235,0.08)] focus:outline-none focus:ring-2 focus:ring-[rgb(37_99_235)] focus:ring-offset-1"
         >
           Create As of Report
         </button>
