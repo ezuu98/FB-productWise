@@ -11,6 +11,107 @@ type Props = {
   warehouses?: Warehouse[];
 };
 
+type Option = { value: string; label: string };
+
+function ChipMultiSelect({
+  id,
+  label,
+  options,
+  selected,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  options: Option[];
+  selected: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const selectedOptions = useMemo(
+    () => selected.map((v) => options.find((o) => o.value === v)).filter(Boolean) as Option[],
+    [selected, options]
+  );
+
+  const toggle = (val: string) => {
+    if (selectedSet.has(val)) {
+      onChange(selected.filter((v) => v !== val));
+    } else {
+      onChange([...selected, val]);
+    }
+  };
+
+  const remove = (val: string) => onChange(selected.filter((v) => v !== val));
+
+  return (
+    <div
+      className="relative"
+      onFocus={() => setOpen(true)}
+      onBlur={(e) => {
+        const rt = e.relatedTarget as Node | null;
+        if (!rt || !e.currentTarget.contains(rt)) setOpen(false);
+      }}
+    >
+      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <button
+        id={id}
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="mt-2 flex w-full min-h-[42px] flex-wrap items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
+      >
+        {selectedOptions.length === 0 ? (
+          <span className="text-sm text-gray-500">Select...</span>
+        ) : (
+          selectedOptions.map((opt) => (
+            <span
+              key={opt.value}
+              className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-800"
+            >
+              {opt.label}
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  remove(opt.value);
+                }}
+                className="ml-1 rounded-full p-0.5 text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                aria-label={`Remove ${opt.label}`}
+              >
+                ×
+              </button>
+            </span>
+          ))
+        )}
+        <span className="ml-auto text-gray-500">▾</span>
+      </button>
+      {open ? (
+        <ul
+          className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-md border border-gray-200 bg-white p-1 shadow-lg"
+          role="listbox"
+          aria-multiselectable
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {options.map((opt) => (
+            <li key={opt.value}>
+              <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1 text-sm hover:bg-gray-50">
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(opt.value)}
+                  onChange={() => toggle(opt.value)}
+                  className="h-4 w-4 rounded border-gray-300 text-gray-700 focus:ring-gray-400"
+                />
+                <span className="text-gray-800">{opt.label}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 export default function ProductPickers({ items, warehouses = [] }: Props) {
   const [qName, setQName] = useState("");
   const [qCode, setQCode] = useState("");
@@ -22,7 +123,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
   const [toDate, setToDate] = useState("");
   const [selectedMovements, setSelectedMovements] = useState<string[]>([]);
 
-  const movementOptions = [
+  const movementOptions: Option[] = [
     { label: "Purchases", value: "purchase" },
     { label: "Purchase Returns", value: "purchase_return" },
     { label: "Sales", value: "sales" },
@@ -32,6 +133,11 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     { label: "wastages", value: "wastages" },
     { label: "Consumptions", value: "consumptions" },
   ];
+
+  const warehouseOptions: Option[] = useMemo(
+    () => warehouses.map((w) => ({ value: String(w.id), label: w.display_name })),
+    [warehouses]
+  );
 
   const norm = (s: string) => s.normalize("NFKD").toLowerCase();
 
@@ -173,27 +279,13 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
         )}
       </div>
       <div className="mt-6 grid gap-6 sm:grid-cols-4">
-        <div>
-          <label htmlFor="wh-multi" className="block text-sm font-medium text-gray-700">
-            Warehouses
-          </label>
-          <select
-            id="wh-multi"
-            multiple
-            size={Math.min(6, Math.max(3, warehouses.length))}
-            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
-            value={selectedWarehouses}
-            onChange={(e) =>
-              setSelectedWarehouses(Array.from(e.currentTarget.selectedOptions).map((o) => o.value))
-            }
-          >
-            {warehouses.map((w) => (
-              <option key={w.id} value={String(w.id)}>
-                {w.display_name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <ChipMultiSelect
+          id="wh-multi"
+          label="Warehouses"
+          options={warehouseOptions}
+          selected={selectedWarehouses}
+          onChange={setSelectedWarehouses}
+        />
         <div>
           <label htmlFor="from-date" className="block text-sm font-medium text-gray-700">
             From date
@@ -218,27 +310,13 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
             className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
           />
         </div>
-        <div>
-          <label htmlFor="move-multi" className="block text-sm font-medium text-gray-700">
-            Type of movement
-          </label>
-          <select
-            id="move-multi"
-            multiple
-            size={Math.min(8, Math.max(4, movementOptions.length))}
-            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
-            value={selectedMovements}
-            onChange={(e) =>
-              setSelectedMovements(Array.from(e.currentTarget.selectedOptions).map((o) => o.value))
-            }
-          >
-            {movementOptions.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <ChipMultiSelect
+          id="move-multi"
+          label="Type of movement"
+          options={movementOptions}
+          selected={selectedMovements}
+          onChange={setSelectedMovements}
+        />
       </div>
     </div>
   );
