@@ -517,7 +517,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
               html += `<th style="text-align:left">Warehouse</th>`;
               if (hasAsOf) html += `<th>Opening Stock</th>`;
               for (const mv of mvs) html += `<th>${htmlEscape(movementLabel(mv))}</th>`;
-              if (hasAsOf) html += `<th>Stock Adjustments</th><th>Total</th>`;
+              if (hasAsOf) html += `<th>Stock Adjustments</th><th>Closing Stock</th>`;
               html += `</tr>`;
               html += `</thead>`;
               html += `<tbody>`;
@@ -626,7 +626,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
                         {mvs.map((mv) => (
                           <th key={mv} className="px-4 py-2 text-center text-xs font-medium text-gray-700">{movementLabel(mv)}</th>
                         ))}
-                        {showAsOf ? <><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Stock Adjustments</th><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Total</th></> : null}
+                        {showAsOf ? <><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Stock Adjustments</th><th className="px-4 py-2 text-center text-xs font-medium text-gray-700">Closing Stock</th></> : null}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
