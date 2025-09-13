@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import FreshBasketHeader from "@/components/freshbasket-header";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { createServerSupabase, createServiceSupabase } from "@/lib/supabase/server";
 import ProductPickers from "@/components/product-pickers";
 
 export const metadata: Metadata = {
@@ -51,24 +51,53 @@ async function fetchAllInventory(supabase: ReturnType<typeof createServerSupabas
 }
 
 async function fetchCategories(
-  supabase: ReturnType<typeof createServerSupabase>,
+  _supabase: ReturnType<typeof createServerSupabase>,
   ids: Array<string | number>
 ) {
   const unique = Array.from(new Set(ids.filter((v) => v !== null && v !== undefined)));
   const chunkSize = 500;
-  const map = new Map<string | number, string>();
+  const map = new Map<number, string>();
+
+  const admin = createServiceSupabase();
 
   for (let i = 0; i < unique.length; i += chunkSize) {
     const chunk = unique.slice(i, i + chunkSize);
-    const { data, error } = await supabase
-      .from("categories")
-      .select("categ_id, complete_name")
-      .in("categ_id", chunk as any);
-    if (error) break;
-    data?.forEach((row: any) => map.set(row.categ_id, row.complete_name));
+    const numbers = chunk
+      .map((v) => (typeof v === "number" ? v : Number(v)))
+      .filter((v) => Number.isFinite(v));
+
+    if (numbers.length) {
+      const { data } = await admin
+        .from("categories")
+        .select("categ_id, complete_name")
+        .in("categ_id", numbers as any);
+      data?.forEach((row: any) => map.set(row.categ_id as number, row.complete_name as string));
+    }
   }
 
   return map;
+}
+
+async function fetchWarehouses(ids: number[]) {
+  const admin = createServiceSupabase();
+
+  // Try plural table first
+  let { data, error } = await admin
+    .from("warehouses")
+    .select("id, display_name")
+    .in("id", ids as any)
+    .order("display_name", { ascending: true });
+
+  if (error || !data || data.length === 0) {
+    const fallback = await admin
+      .from("warehouse")
+      .select("id, display_name")
+      .in("id", ids as any)
+      .order("display_name", { ascending: true });
+    data = fallback.data ?? null;
+  }
+
+  return (data ?? []).map((w: any) => ({ id: Number(w.id), display_name: String(w.display_name) }));
 }
 
 export default async function ProductWiseDetailsPage() {
@@ -82,8 +111,17 @@ export default async function ProductWiseDetailsPage() {
     id: String(p.id ?? productLabel(p) ?? productCode(p) ?? Math.random()),
     label: productLabel(p),
     code: productCode(p),
-    category: categoryMap.get(p.category_id) ?? null,
+    category:
+      categoryMap.get(Number(p.category_id)) ??
+      p.complete_name ??
+      p.category_name ??
+      p.category ??
+      p.categ_name ??
+      p.category_full_name ??
+      null,
   }));
+
+  const warehouses = await fetchWarehouses([8, 9, 10, 11, 12, 18]);
 
   return (
     <main className="min-h-screen bg-white text-gray-900">
@@ -93,7 +131,7 @@ export default async function ProductWiseDetailsPage() {
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Live Inventory Tracking</h1>
 
         <div className="mt-6 w-full">
-          <ProductPickers items={items} />
+          <ProductPickers items={items} warehouses={warehouses} />
           {error && (
             <p className="mt-2 text-sm text-red-600">Failed to load products: {error.message}</p>
           )}
