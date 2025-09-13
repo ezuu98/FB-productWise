@@ -36,7 +36,7 @@ function nextUtcStart(dateStr?: string | null) {
 const MOVEMENT_ALIASES: Record<string, string[]> = {
   purchase: ["purchase", "purchases"],
   sales: ["sales"],
-  sales_returns: ["sales_returns", "sales_return", "sale_return"],
+  sales_returns: ["sales_returns"],
   purchase_return: ["purchase_return", "purchase_returns"],
   manufacturing: ["manufacturing", "manufacture"],
   wastages: ["wastages", "wastage"],
