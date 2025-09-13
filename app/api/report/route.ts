@@ -58,7 +58,9 @@ export async function POST(req: Request) {
 
     const supabase = createServiceSupabase();
 
-    const byWarehouse: Record<string, Record<string, number>> = {};
+    type RowAgg = { warehouseId: string; productId: string; moves: Record<string, number> };
+    const map = new Map<string, RowAgg>();
+    const totals: Record<string, number> = {};
 
     // Normalize date range to UTC day boundaries using provided values only
     const startISO = toUtcStart(fromDate || null);
@@ -84,15 +86,25 @@ export async function POST(req: Request) {
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
       for (const row of data ?? []) {
-        const wh = String(row[col as keyof typeof row]);
-        if (!byWarehouse[wh]) byWarehouse[wh] = {};
+        const warehouseId = String(row[col as keyof typeof row]);
+        const productId = String(row.product_id);
+        const key = `${warehouseId}|${productId}`;
         const rawQty = Number(row.quantity ?? 0);
         const qty = mv === "sales_returns" ? Math.abs(rawQty) : rawQty;
-        byWarehouse[wh][mv] = (byWarehouse[wh][mv] ?? 0) + qty;
+
+        let agg = map.get(key);
+        if (!agg) {
+          agg = { warehouseId, productId, moves: {} };
+          map.set(key, agg);
+        }
+        agg.moves[mv] = (agg.moves[mv] ?? 0) + qty;
+        totals[mv] = (totals[mv] ?? 0) + qty;
       }
     }
 
-    return NextResponse.json({ byWarehouse });
+    const rows = Array.from(map.values());
+
+    return NextResponse.json({ rows, totals });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Unknown error" }, { status: 500 });
   }
