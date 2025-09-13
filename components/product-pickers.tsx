@@ -12,6 +12,8 @@ export default function ProductPickers({ items }: Props) {
   const [qName, setQName] = useState("");
   const [qCode, setQCode] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [isNameOpen, setIsNameOpen] = useState(false);
+  const [isCodeOpen, setIsCodeOpen] = useState(false);
 
   const norm = (s: string) => s.normalize("NFKD").toLowerCase();
 
@@ -49,10 +51,19 @@ export default function ProductPickers({ items }: Props) {
   const namePoolIds = new Set(namePool.map((i) => i.id));
   const codePoolIds = new Set(codePool.map((i) => i.id));
 
+  const showNameDropdown = (isNameOpen || qName.trim().length > 0) && namePool.length > 0;
+  const showCodeDropdown = (isCodeOpen || qCode.trim().length > 0) && codePool.length > 0;
+
   return (
     <div className="w-full">
       <div className="grid gap-6 sm:grid-cols-2">
-        <div>
+        <div
+          onFocus={() => setIsNameOpen(true)}
+          onBlur={(e) => {
+            const rt = e.relatedTarget as Node | null;
+            if (!rt || !e.currentTarget.contains(rt)) setIsNameOpen(false);
+          }}
+        >
           <label htmlFor="search-name" className="block text-sm font-medium text-gray-700">
             Search by name
           </label>
@@ -64,7 +75,7 @@ export default function ProductPickers({ items }: Props) {
             placeholder="Type name..."
             className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
           />
-          {qName.trim() ? (
+          {showNameDropdown ? (
             <select
               aria-label="Results by name"
               multiple
@@ -79,10 +90,15 @@ export default function ProductPickers({ items }: Props) {
                 </option>
               ))}
             </select>
-          ) : null
-          }
+          ) : null}
         </div>
-        <div>
+        <div
+          onFocus={() => setIsCodeOpen(true)}
+          onBlur={(e) => {
+            const rt = e.relatedTarget as Node | null;
+            if (!rt || !e.currentTarget.contains(rt)) setIsCodeOpen(false);
+          }}
+        >
           <label htmlFor="search-code" className="block text-sm font-medium text-gray-700">
             Search by barcode
           </label>
@@ -94,7 +110,7 @@ export default function ProductPickers({ items }: Props) {
             placeholder="Type barcode..."
             className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
           />
-          {qCode.trim() ? (
+          {showCodeDropdown ? (
             <select
               aria-label="Results by barcode"
               multiple
@@ -109,8 +125,7 @@ export default function ProductPickers({ items }: Props) {
                 </option>
               ))}
             </select>
-          ) : null
-          }
+          ) : null}
         </div>
       </div>
 
