@@ -42,7 +42,7 @@ const MOVEMENT_ALIASES: Record<string, string[]> = {
   wastages: ["wastages", "wastage"],
   consumption: ["consumption", "consumptions"],
   transfer_in: ["transfer_in", "transfer"],
-  transfer_out: ["transfer_in", "transfer_out"],
+  transfer_out: ["transfer_out"],
 };
 
 export async function POST(req: Request) {
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
           const productId = String(row.product_id);
           const key = `${warehouseId}|${productId}`;
           const rawQty = Number(row.quantity ?? 0);
-          const qty = mv === "sales_returns" ? Math.abs(rawQty) : rawQty;
+          const qty = Math.abs(rawQty);
 
           let agg = map.get(key);
           if (!agg) {
