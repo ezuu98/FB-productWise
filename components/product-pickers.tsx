@@ -129,8 +129,8 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     { label: "Sales", value: "sales" },
     { label: "Sales Returns", value: "sales_returns" },
     { label: "Transfers", value: "transfer_in" },
-    { label: "manufacturings", value: "manufacturing" },
-    { label: "wastages", value: "wastages" },
+    { label: "Manufacturings", value: "manufacturing" },
+    { label: "Wastages", value: "wastages" },
     { label: "Consumptions", value: "consumptions" },
   ];
 
