@@ -139,7 +139,7 @@ export default function ProductPickers({ items }: Props) {
               <li key={it.id} className="flex items-center justify-between px-4 py-2">
                 <span className="truncate text-sm text-gray-900">
                   {it.label}
-                  {it.category ? <span className="text-gray-500"> {"{"}{it.category}{"}"} (Category)</span> : null}
+                  {it.category ? <span className="text-gray-500"> ({it.category})</span> : null}
                   {it.code ? <span className="text-gray-500"> — {it.code}</span> : null}
                 </span>
                 <button
