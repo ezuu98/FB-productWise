@@ -186,23 +186,58 @@ export async function POST(req: Request) {
         const pageSize = 1000;
         let offset = 0;
         while (true) {
-          let query = supabase
+          // Try primary: stock_corrections with correction_date and variance_quantity
+          let query1 = supabase
             .from("stock_corrections")
             .select("product_id, warehouse_id, variance_quantity, correction_date")
             .in("product_id", productIds)
             .in("warehouse_id", uuidList)
             .order("correction_date", { ascending: true })
             .range(offset, offset + pageSize - 1);
-          if (startISO) query = query.gte("correction_date", startISO);
-          if (endISO) query = query.lt("correction_date", endISO);
-          const { data, error } = await query;
+          if (fromDate) query1 = query1.gte("correction_date", fromDate);
+          if (toDate) query1 = query1.lte("correction_date", toDate);
+          let { data, error } = await query1;
+
+          // Fallback A: same table but created_at instead of correction_date
+          if (error) {
+            let queryA = supabase
+              .from("stock_corrections")
+              .select("product_id, warehouse_id, variance_quantity, created_at")
+              .in("product_id", productIds)
+              .in("warehouse_id", uuidList)
+              .order("created_at", { ascending: true })
+              .range(offset, offset + pageSize - 1);
+            if (startISO) queryA = queryA.gte("created_at", startISO);
+            if (endISO) queryA = queryA.lt("created_at", endISO);
+            const resA = await queryA;
+            data = resA.data as any;
+            error = resA.error as any;
+          }
+
+          // Fallback B: singular table name
+          if (error) {
+            let queryB = supabase
+              .from("stock_correction")
+              .select("product_id, warehouse_id, variance_quantity, correction_date")
+              .in("product_id", productIds)
+              .in("warehouse_id", uuidList)
+              .order("correction_date", { ascending: true })
+              .range(offset, offset + pageSize - 1);
+            if (fromDate) queryB = queryB.gte("correction_date", fromDate);
+            if (toDate) queryB = queryB.lte("correction_date", toDate);
+            const resB = await queryB;
+            data = resB.data as any;
+            error = resB.error as any;
+          }
+
           if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-          for (const row of data ?? []) {
-            const warehouseUuid = String(row.warehouse_id);
+
+          for (const row of (data as any[]) ?? []) {
+            const warehouseUuid = String((row as any).warehouse_id);
             const warehouseId = uuidToId.get(warehouseUuid) || warehouseUuid; // fallback to uuid
-            const productId = String(row.product_id);
+            const productId = String((row as any).product_id);
             const key = `${warehouseId}|${productId}`;
-            const qty = Number((row as any).variance_quantity ?? 0);
+            const qty = Number((row as any).variance_quantity ?? (row as any).variance ?? (row as any).variance_qty ?? 0);
             let agg = map.get(key);
             if (!agg) {
               agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
@@ -211,7 +246,7 @@ export async function POST(req: Request) {
             agg.adjustments = (agg.adjustments ?? 0) + qty;
             totals.adjustments = (totals.adjustments ?? 0) + qty;
           }
-          if (!data || data.length < pageSize) break;
+          if (!data || (data as any[]).length < pageSize) break;
           offset += pageSize;
           if (offset > 500000) break;
         }
