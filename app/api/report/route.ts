@@ -18,6 +18,19 @@ function pickWarehouseColumn(movement: string): "warehouse_id" | "warehouse_dest
   }
 }
 
+function toUtcStart(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+}
+function nextUtcStart(dateStr?: string | null) {
+  if (!dateStr) return null;
+  const d = new Date(`${dateStr}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString();
+}
+
 export async function POST(req: Request) {
   try {
     const { productIds, warehouseIds, movements, fromDate, toDate } = await req.json();
@@ -33,10 +46,13 @@ export async function POST(req: Request) {
 
     const byWarehouse: Record<string, Record<string, number>> = {};
 
+    // Normalize date range to UTC day boundaries
+    const startISO = toUtcStart(fromDate || toDate || null);
+    const endISO = nextUtcStart(toDate || fromDate || null);
+
     for (const mv of movements as string[]) {
       const col = pickWarehouseColumn(mv);
 
-      // Build dynamic query
       let query = supabase
         .from("stock_movements")
         .select("product_id, warehouse_id, warehouse_dest_id, movement_type, quantity, created_at")
@@ -47,8 +63,8 @@ export async function POST(req: Request) {
         // @ts-ignore dynamic column name
         query = query.in(col as any, warehouseIds);
       }
-      if (fromDate) query = query.gte("created_at", fromDate);
-      if (toDate) query = query.lte("created_at", toDate);
+      if (startISO) query = query.gte("created_at", startISO);
+      if (endISO) query = query.lt("created_at", endISO);
 
       const { data, error } = await query;
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
