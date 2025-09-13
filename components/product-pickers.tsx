@@ -134,7 +134,7 @@ export default function ProductPickers({ items, warehouses = [] }: Props) {
     { label: "Transfers", value: "transfer_in" },
     { label: "Manufacturings", value: "manufacturing" },
     { label: "Wastages", value: "wastages" },
-    { label: "Consumptions", value: "consumptions" },
+    { label: "Consumption", value: "consumption" },
   ];
 
   const warehouseOptions: Option[] = useMemo(
