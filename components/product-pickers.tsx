@@ -4,16 +4,22 @@ import { useMemo, useState } from "react";
 
 type Item = { id: string; label: string; code?: string | null; category?: string | null };
 
+type Warehouse = { id: number; display_name: string };
+
 type Props = {
   items: Item[];
+  warehouses?: Warehouse[];
 };
 
-export default function ProductPickers({ items }: Props) {
+export default function ProductPickers({ items, warehouses = [] }: Props) {
   const [qName, setQName] = useState("");
   const [qCode, setQCode] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
   const [isNameOpen, setIsNameOpen] = useState(false);
   const [isCodeOpen, setIsCodeOpen] = useState(false);
+  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
 
   const norm = (s: string) => s.normalize("NFKD").toLowerCase();
 
@@ -153,6 +159,53 @@ export default function ProductPickers({ items }: Props) {
             ))}
           </ul>
         )}
+      </div>
+      <div className="mt-6 grid gap-6 sm:grid-cols-3">
+        <div>
+          <label htmlFor="wh-multi" className="block text-sm font-medium text-gray-700">
+            Warehouses
+          </label>
+          <select
+            id="wh-multi"
+            multiple
+            size={Math.min(6, Math.max(3, warehouses.length))}
+            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
+            value={selectedWarehouses}
+            onChange={(e) =>
+              setSelectedWarehouses(Array.from(e.currentTarget.selectedOptions).map((o) => o.value))
+            }
+          >
+            {warehouses.map((w) => (
+              <option key={w.id} value={String(w.id)}>
+                {w.display_name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="from-date" className="block text-sm font-medium text-gray-700">
+            From date
+          </label>
+          <input
+            id="from-date"
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
+          />
+        </div>
+        <div>
+          <label htmlFor="to-date" className="block text-sm font-medium text-gray-700">
+            To date
+          </label>
+          <input
+            id="to-date"
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="mt-2 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-gray-400 focus:outline-none"
+          />
+        </div>
       </div>
     </div>
   );
