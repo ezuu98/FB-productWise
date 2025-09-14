@@ -50,13 +50,12 @@ export async function POST(req: Request) {
   try {
     const { productIds, warehouseIds, fromDate, toDate, movements } = await req.json();
 
-    // Defaults: from 2025-06-30 to today if not provided
+    // Hard-coded From date per requirements
     const today = new Date();
     const y = today.getUTCFullYear();
     const m = String(today.getUTCMonth() + 1).padStart(2, "0");
     const d = String(today.getUTCDate()).padStart(2, "0");
-    const defFrom = "2025-06-30";
-    const useFromDate = fromDate || defFrom;
+    const useFromDate = "2025-07-01";
     const useToDate = toDate || `${y}-${m}-${d}`;
 
     if (!Array.isArray(productIds) || productIds.length === 0)
@@ -167,33 +166,27 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3) Stock adjustments from stock_corrections (product_id, warehouse_id(uuid), variance_quantity)
+    // 3) Stock adjustments from stock_corrections (product_id, warehouse_id, variance_quantity)
     {
-      // Map numeric warehouse ids -> uuid warehouse_id
-      // Fetch warehouse UUIDs robustly: prefer warehouses.uuid, fallback to other common fields
+      // Build UUID mapping if present, but also support numeric warehouse_id
       let wrows: any[] = [];
       {
         let res = await supabase
           .from("warehouses")
-          .select("id, uuid")
-          .in("id", warehouseIds);
+          .select("id, uuid, warehouse_uuid");
         if (res.error) {
-          // Try wide select to detect available uuid-like fields
           res = await supabase
             .from("warehouses")
-            .select("id, *")
-            .in("id", warehouseIds);
+            .select("id, uuid, warehouse_uuid");
         }
         if (res.error || !res.data || res.data.length === 0) {
           let res2 = await supabase
             .from("warehouse")
-            .select("id, uuid")
-            .in("id", warehouseIds);
+            .select("id, uuid, warehouse_uuid");
           if (res2.error) {
             res2 = await supabase
               .from("warehouse")
-              .select("id, *")
-              .in("id", warehouseIds);
+              .select("id, uuid, warehouse_uuid");
           }
           wrows = res2.data ?? [];
         } else {
@@ -204,81 +197,75 @@ export async function POST(req: Request) {
       const uuidToId = new Map<string, string>();
       for (const w of wrows ?? []) {
         const id = String(w.id);
-        const uuid = String(((w as any).uuid ?? (w as any).warehouse_id ?? (w as any).warehouse_uuid ?? ""));
+        const uuid = String((w as any).uuid ?? (w as any).warehouse_uuid ?? "");
         if (uuid) {
           idToUuid.set(id, uuid);
           uuidToId.set(uuid, id);
         }
       }
       const uuidList = Array.from(idToUuid.values());
-      if (uuidList.length) {
-        const pageSize = 1000;
-        let offset = 0;
-        while (true) {
-          // Try primary: stock_corrections with correction_date and variance_quantity
-          let query1 = supabase
-            .from("stock_corrections")
-            .select("product_id, warehouse_id, variance_quantity, correction_date")
-            .in("product_id", productIds)
-            .in("warehouse_id", uuidList)
-            .order("correction_date", { ascending: true })
-            .range(offset, offset + pageSize - 1);
-          if (useFromDate) query1 = query1.gte("correction_date", useFromDate);
-          if (useToDate) query1 = query1.lte("correction_date", useToDate);
-          let { data, error } = await query1;
+      const numericIdSet = new Set((warehouseIds || []).map((v: any) => String(v)));
 
-          // Fallback A: same table but created_at instead of correction_date
-          if (error) {
-            let queryA = supabase
-              .from("stock_corrections")
-              .select("product_id, warehouse_id, variance_quantity, created_at")
-              .in("product_id", productIds)
-              .in("warehouse_id", uuidList)
-              .order("created_at", { ascending: true })
-              .range(offset, offset + pageSize - 1);
-            if (startISO) queryA = queryA.gte("created_at", startISO);
-            if (endISO) queryA = queryA.lt("created_at", endISO);
-            const resA = await queryA;
-            data = resA.data as any;
-            error = resA.error as any;
-          }
+      const pageSize = 1000;
+      let offset = 0;
+      const runAndAccumulate = async (table: string) => {
+        let query = supabase
+          .from(table)
+          .select("id, product_id, warehouse_id, variance_quantity, correction_date")
+          .in("product_id", productIds)
+          .order("correction_date", { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (useFromDate) query = query.gte("correction_date", useFromDate);
+        if (useToDate) query = query.lte("correction_date", useToDate);
+        const { data, error } = await query;
+        if (error) return { data: [] as any[], error };
+        return { data: (data as any[]) ?? [], error: null };
+      };
 
-          // Fallback B: singular table name
-          if (error) {
-            let queryB = supabase
-              .from("stock_correction")
-              .select("product_id, warehouse_id, variance_quantity, correction_date")
-              .in("product_id", productIds)
-              .in("warehouse_id", uuidList)
-              .order("correction_date", { ascending: true })
-              .range(offset, offset + pageSize - 1);
-            if (useFromDate) queryB = queryB.gte("correction_date", useFromDate);
-            if (useToDate) queryB = queryB.lte("correction_date", useToDate);
-            const resB = await queryB;
-            data = resB.data as any;
-            error = resB.error as any;
-          }
+      // We'll try multiple variants and merge results
+      while (true) {
+        let rows: any[] = [];
+        let err: any = null;
 
-          if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+        // Try stock_corrections (uuid, correction_date)
+        ({ data: rows, error: err } = await runAndAccumulate("stock_corrections"));
 
-          for (const row of (data as any[]) ?? []) {
-            const warehouseUuid = String((row as any).warehouse_id);
-            const warehouseId = uuidToId.get(warehouseUuid) || warehouseUuid; // fallback to uuid
-            const productId = String((row as any).product_id);
-            const key = `${warehouseId}|${productId}`;
-            const qty = Number((row as any).variance_quantity ?? (row as any).variance ?? (row as any).variance_qty ?? 0);
-            let agg = map.get(key);
-            if (!agg) {
-              agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
-              map.set(key, agg);
-            }
-            agg.adjustments = (agg.adjustments ?? 0) + qty;
-            totals.adjustments = (totals.adjustments ?? 0) + qty;
-          }
-          if (!data || (data as any[]).length < pageSize) break;
-          offset += pageSize;
-          if (offset > 500000) break;
+        if (err && !rows.length) {
+          // If truly an error and no data, surface it
+          return NextResponse.json({ error: err.message }, { status: 500 });
         }
+
+        for (const row of rows) {
+          const rawWh = (row as any).warehouse_id;
+          const whUuid = typeof rawWh === "string" ? rawWh : "";
+          let warehouseId = "";
+          if (whUuid) warehouseId = uuidToId.get(whUuid) || whUuid; // map uuid->id or keep uuid
+          // If we still don't have a numeric match to the selected list, skip
+          if (warehouseId && !numericIdSet.has(String(warehouseId))) {
+            if (whUuid) {
+              const mapped = uuidToId.get(whUuid);
+              if (!mapped || !numericIdSet.has(String(mapped))) continue;
+              warehouseId = String(mapped);
+            } else {
+              continue;
+            }
+          }
+          const productId = String((row as any).product_id);
+          const key = `${warehouseId}|${productId}`;
+          const qty = Number((row as any).variance_quantity ?? 0);
+          if (!Number.isFinite(qty)) continue;
+          let agg = map.get(key);
+          if (!agg) {
+            agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
+            map.set(key, agg);
+          }
+          agg.adjustments = (agg.adjustments ?? 0) + qty;
+          totals.adjustments = (totals.adjustments ?? 0) + qty;
+        }
+
+        if (!rows || rows.length < pageSize) break;
+        offset += pageSize;
+        if (offset > 500000) break;
       }
     }
 
