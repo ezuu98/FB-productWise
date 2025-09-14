@@ -166,18 +166,16 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3) Stock adjustments from stock_corrections (product_id, warehouse_id(uuid), variance_quantity)
+    // 3) Stock adjustments from stock_corrections (product_id, warehouse_id, variance_quantity)
     {
-      // Map numeric warehouse ids -> uuid warehouse_id
-      // Fetch warehouse UUIDs robustly: prefer warehouses.uuid, fallback to other common fields
+      // Build UUID mapping if present, but also support numeric warehouse_id
       let wrows: any[] = [];
       {
         let res = await supabase
           .from("warehouses")
-          .select("id, uuid")
+          .select("id, uuid, warehouse_id, warehouse_uuid")
           .in("id", warehouseIds);
         if (res.error) {
-          // Try wide select to detect available uuid-like fields
           res = await supabase
             .from("warehouses")
             .select("id, *")
@@ -186,7 +184,7 @@ export async function POST(req: Request) {
         if (res.error || !res.data || res.data.length === 0) {
           let res2 = await supabase
             .from("warehouse")
-            .select("id, uuid")
+            .select("id, uuid, warehouse_id, warehouse_uuid")
             .in("id", warehouseIds);
           if (res2.error) {
             res2 = await supabase
@@ -210,74 +208,103 @@ export async function POST(req: Request) {
         }
       }
       const uuidList = Array.from(idToUuid.values());
-      if (uuidList.length) {
-        const pageSize = 1000;
-        let offset = 0;
-        while (true) {
-          // Try primary: stock_corrections with correction_date and variance_quantity
-          let query1 = supabase
-            .from("stock_corrections")
-            .select("product_id, warehouse_id, variance_quantity, correction_date")
-            .in("product_id", productIds)
-            .in("warehouse_id", uuidList)
-            .order("correction_date", { ascending: true })
-            .range(offset, offset + pageSize - 1);
-          if (useFromDate) query1 = query1.gte("correction_date", useFromDate);
-          if (useToDate) query1 = query1.lte("correction_date", useToDate);
-          let { data, error } = await query1;
+      const numericIdList = (warehouseIds || []).map((v: any) => (typeof v === "number" ? v : Number(v))).filter((n: any) => Number.isFinite(n));
+      const numericIdSet = new Set((warehouseIds || []).map((v: any) => String(v)));
 
-          // Fallback A: same table but created_at instead of correction_date
-          if (error) {
-            let queryA = supabase
-              .from("stock_corrections")
-              .select("product_id, warehouse_id, variance_quantity, created_at")
-              .in("product_id", productIds)
-              .in("warehouse_id", uuidList)
-              .order("created_at", { ascending: true })
-              .range(offset, offset + pageSize - 1);
-            if (startISO) queryA = queryA.gte("created_at", startISO);
-            if (endISO) queryA = queryA.lt("created_at", endISO);
-            const resA = await queryA;
-            data = resA.data as any;
-            error = resA.error as any;
-          }
-
-          // Fallback B: singular table name
-          if (error) {
-            let queryB = supabase
-              .from("stock_correction")
-              .select("product_id, warehouse_id, variance_quantity, correction_date")
-              .in("product_id", productIds)
-              .in("warehouse_id", uuidList)
-              .order("correction_date", { ascending: true })
-              .range(offset, offset + pageSize - 1);
-            if (useFromDate) queryB = queryB.gte("correction_date", useFromDate);
-            if (useToDate) queryB = queryB.lte("correction_date", useToDate);
-            const resB = await queryB;
-            data = resB.data as any;
-            error = resB.error as any;
-          }
-
-          if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-          for (const row of (data as any[]) ?? []) {
-            const warehouseUuid = String((row as any).warehouse_id);
-            const warehouseId = uuidToId.get(warehouseUuid) || warehouseUuid; // fallback to uuid
-            const productId = String((row as any).product_id);
-            const key = `${warehouseId}|${productId}`;
-            const qty = Number((row as any).variance_quantity ?? (row as any).variance ?? (row as any).variance_qty ?? 0);
-            let agg = map.get(key);
-            if (!agg) {
-              agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
-              map.set(key, agg);
-            }
-            agg.adjustments = (agg.adjustments ?? 0) + qty;
-            totals.adjustments = (totals.adjustments ?? 0) + qty;
-          }
-          if (!data || (data as any[]).length < pageSize) break;
-          offset += pageSize;
-          if (offset > 500000) break;
+      const pageSize = 1000;
+      let offset = 0;
+      const runAndAccumulate = async (table: string, dateCol: string, filterBy: "uuid" | "numeric") => {
+        let query = supabase
+          .from(table)
+          .select("id, product_id, warehouse_id, variance_quantity, variance, variance_qty, correction_date, created_at")
+          .in("product_id", productIds)
+          .order(dateCol, { ascending: true })
+          .range(offset, offset + pageSize - 1);
+        if (filterBy === "uuid" && uuidList.length) query = query.in("warehouse_id", uuidList as any);
+        if (filterBy === "numeric" && numericIdList.length) query = query.in("warehouse_id", numericIdList as any);
+        if (dateCol === "correction_date") {
+          if (useFromDate) query = query.gte("correction_date", useFromDate);
+          if (useToDate) query = query.lte("correction_date", useToDate);
+        } else {
+          if (startISO) query = query.gte("created_at", startISO);
+          if (endISO) query = query.lt("created_at", endISO);
         }
+        const { data, error } = await query;
+        if (error) return { data: [] as any[], error };
+        return { data: (data as any[]) ?? [], error: null };
+      };
+
+      // We'll try multiple variants and merge results
+      while (true) {
+        let rows: any[] = [];
+        let err: any = null;
+
+        // Try stock_corrections (uuid, correction_date)
+        ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date", "uuid"));
+        // If empty, try created_at
+        if (err || rows.length === 0) {
+          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "created_at", "uuid"));
+        }
+        // If still empty, try numeric filter
+        if (err || rows.length === 0) {
+          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date", "numeric"));
+          if (rows.length === 0) {
+            ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "created_at", "numeric"));
+          }
+        }
+        // Fallback to singular table name
+        if (err || rows.length === 0) {
+          ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "correction_date", "uuid"));
+          if (rows.length === 0) {
+            ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "created_at", "uuid"));
+          }
+          if (rows.length === 0) {
+            ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "correction_date", "numeric"));
+            if (rows.length === 0) {
+              ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "created_at", "numeric"));
+            }
+          }
+        }
+
+        if (err && !rows.length) {
+          // If truly an error and no data, surface it
+          return NextResponse.json({ error: err.message }, { status: 500 });
+        }
+
+        for (const row of rows) {
+          const rawWh = (row as any).warehouse_id;
+          const whUuid = typeof rawWh === "string" ? rawWh : "";
+          const whNum = typeof rawWh === "number" ? String(rawWh) : "";
+          let warehouseId = "";
+          if (whUuid) warehouseId = uuidToId.get(whUuid) || whUuid; // map uuid->id or keep uuid
+          if (!warehouseId && whNum) warehouseId = whNum; // numeric id direct
+          // As a last resort, if warehouse not matched, skip rows not in selected warehouses
+          if (warehouseId && !numericIdSet.has(String(warehouseId))) {
+            // If we only had uuid and mapped to uuid string, compare via reverse map
+            if (whUuid) {
+              const mapped = uuidToId.get(whUuid);
+              if (!mapped || !numericIdSet.has(String(mapped))) continue;
+              warehouseId = String(mapped);
+            } else {
+              continue;
+            }
+          }
+          const productId = String((row as any).product_id);
+          const key = `${warehouseId}|${productId}`;
+          const qty = Number((row as any).variance_quantity ?? (row as any).variance ?? (row as any).variance_qty ?? 0);
+          if (!Number.isFinite(qty)) continue;
+          let agg = map.get(key);
+          if (!agg) {
+            agg = { warehouseId, productId, opening: 0, adjustments: 0, moves: {} };
+            map.set(key, agg);
+          }
+          agg.adjustments = (agg.adjustments ?? 0) + qty;
+          totals.adjustments = (totals.adjustments ?? 0) + qty;
+        }
+
+        if (!rows || rows.length < pageSize) break;
+        offset += pageSize;
+        if (offset > 500000) break;
       }
     }
 
