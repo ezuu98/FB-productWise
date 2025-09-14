@@ -252,19 +252,6 @@ export async function POST(req: Request) {
             ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "created_at", "numeric"));
           }
         }
-        // Fallback to singular table name
-        if (err || rows.length === 0) {
-          ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "correction_date", "uuid"));
-          if (rows.length === 0) {
-            ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "created_at", "uuid"));
-          }
-          if (rows.length === 0) {
-            ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "correction_date", "numeric"));
-            if (rows.length === 0) {
-              ({ data: rows, error: err } = await runAndAccumulate("stock_correction", "created_at", "numeric"));
-            }
-          }
-        }
 
         if (err && !rows.length) {
           // If truly an error and no data, surface it
