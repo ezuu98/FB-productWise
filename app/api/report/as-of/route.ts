@@ -50,13 +50,12 @@ export async function POST(req: Request) {
   try {
     const { productIds, warehouseIds, fromDate, toDate, movements } = await req.json();
 
-    // Defaults: from 2025-06-30 to today if not provided
+    // Hard-coded From date per requirements
     const today = new Date();
     const y = today.getUTCFullYear();
     const m = String(today.getUTCMonth() + 1).padStart(2, "0");
     const d = String(today.getUTCDate()).padStart(2, "0");
-    const defFrom = "2025-06-30";
-    const useFromDate = fromDate || defFrom;
+    const useFromDate = "2025-07-01";
     const useToDate = toDate || `${y}-${m}-${d}`;
 
     if (!Array.isArray(productIds) || productIds.length === 0)
