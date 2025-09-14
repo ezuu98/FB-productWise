@@ -219,7 +219,6 @@ export async function POST(req: Request) {
           .in("product_id", productIds)
           .order("correction_date", { ascending: true })
           .range(offset, offset + pageSize - 1);
-        if (uuidList.length) query = query.in("warehouse_id", uuidList as any);
         if (useFromDate) query = query.gte("correction_date", useFromDate);
         if (useToDate) query = query.lte("correction_date", useToDate);
         const { data, error } = await query;
