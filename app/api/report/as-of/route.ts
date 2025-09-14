@@ -201,7 +201,7 @@ export async function POST(req: Request) {
       const uuidToId = new Map<string, string>();
       for (const w of wrows ?? []) {
         const id = String(w.id);
-        const uuid = String(((w as any).warehouse_id ?? (w as any).uuid ?? (w as any).warehouse_uuid ?? ""));
+        const uuid = String((w as any).uuid ?? "");
         if (uuid) {
           idToUuid.set(id, uuid);
           uuidToId.set(uuid, id);
