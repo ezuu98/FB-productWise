@@ -173,24 +173,20 @@ export async function POST(req: Request) {
       {
         let res = await supabase
           .from("warehouses")
-          .select("id, uuid")
-          .in("id", warehouseIds);
+          .select("id, uuid");
         if (res.error) {
           res = await supabase
             .from("warehouses")
-            .select("id, *")
-            .in("id", warehouseIds);
+            .select("id, *");
         }
         if (res.error || !res.data || res.data.length === 0) {
           let res2 = await supabase
             .from("warehouse")
-            .select("id, uuid")
-            .in("id", warehouseIds);
+            .select("id, uuid");
           if (res2.error) {
             res2 = await supabase
               .from("warehouse")
-              .select("id, *")
-              .in("id", warehouseIds);
+              .select("id, *");
           }
           wrows = res2.data ?? [];
         } else {
