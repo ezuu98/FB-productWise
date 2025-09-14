@@ -208,20 +208,18 @@ export async function POST(req: Request) {
         }
       }
       const uuidList = Array.from(idToUuid.values());
-      const numericIdList = (warehouseIds || []).map((v: any) => (typeof v === "number" ? v : Number(v))).filter((n: any) => Number.isFinite(n));
       const numericIdSet = new Set((warehouseIds || []).map((v: any) => String(v)));
 
       const pageSize = 1000;
       let offset = 0;
-      const runAndAccumulate = async (table: string, dateCol: string, filterBy: "uuid" | "numeric") => {
+      const runAndAccumulate = async (table: string, dateCol: string) => {
         let query = supabase
           .from(table)
           .select("id, product_id, warehouse_id, variance_quantity, correction_date, uploaded_at")
           .in("product_id", productIds)
           .order(dateCol, { ascending: true })
           .range(offset, offset + pageSize - 1);
-        if (filterBy === "uuid" && uuidList.length) query = query.in("warehouse_id", uuidList as any);
-        if (filterBy === "numeric" && numericIdList.length) query = query.in("warehouse_id", numericIdList as any);
+        if (uuidList.length) query = query.in("warehouse_id", uuidList as any);
         if (dateCol === "correction_date") {
           if (useFromDate) query = query.gte("correction_date", useFromDate);
           if (useToDate) query = query.lte("correction_date", useToDate);
@@ -240,17 +238,10 @@ export async function POST(req: Request) {
         let err: any = null;
 
         // Try stock_corrections (uuid, correction_date)
-        ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date", "uuid"));
+        ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date"));
         // If empty, try uploaded_at
         if (err || rows.length === 0) {
-          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "uploaded_at", "uuid"));
-        }
-        // If still empty, try numeric filter
-        if (err || rows.length === 0) {
-          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date", "numeric"));
-          if (rows.length === 0) {
-            ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "uploaded_at", "numeric"));
-          }
+          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "uploaded_at"));
         }
 
         if (err && !rows.length) {
@@ -261,13 +252,10 @@ export async function POST(req: Request) {
         for (const row of rows) {
           const rawWh = (row as any).warehouse_id;
           const whUuid = typeof rawWh === "string" ? rawWh : "";
-          const whNum = typeof rawWh === "number" ? String(rawWh) : "";
           let warehouseId = "";
           if (whUuid) warehouseId = uuidToId.get(whUuid) || whUuid; // map uuid->id or keep uuid
-          if (!warehouseId && whNum) warehouseId = whNum; // numeric id direct
-          // As a last resort, if warehouse not matched, skip rows not in selected warehouses
+          // If we still don't have a numeric match to the selected list, skip
           if (warehouseId && !numericIdSet.has(String(warehouseId))) {
-            // If we only had uuid and mapped to uuid string, compare via reverse map
             if (whUuid) {
               const mapped = uuidToId.get(whUuid);
               if (!mapped || !numericIdSet.has(String(mapped))) continue;
