@@ -173,7 +173,7 @@ export async function POST(req: Request) {
       {
         let res = await supabase
           .from("warehouses")
-          .select("id, uuid, warehouse_id, warehouse_uuid")
+          .select("id, warehouse_id")
           .in("id", warehouseIds);
         if (res.error) {
           res = await supabase
@@ -184,7 +184,7 @@ export async function POST(req: Request) {
         if (res.error || !res.data || res.data.length === 0) {
           let res2 = await supabase
             .from("warehouse")
-            .select("id, uuid, warehouse_id, warehouse_uuid")
+            .select("id, warehouse_id")
             .in("id", warehouseIds);
           if (res2.error) {
             res2 = await supabase
@@ -201,7 +201,7 @@ export async function POST(req: Request) {
       const uuidToId = new Map<string, string>();
       for (const w of wrows ?? []) {
         const id = String(w.id);
-        const uuid = String(((w as any).uuid ?? (w as any).warehouse_id ?? (w as any).warehouse_uuid ?? ""));
+        const uuid = String(((w as any).warehouse_id ?? (w as any).uuid ?? (w as any).warehouse_uuid ?? ""));
         if (uuid) {
           idToUuid.set(id, uuid);
           uuidToId.set(uuid, id);
@@ -212,21 +212,16 @@ export async function POST(req: Request) {
 
       const pageSize = 1000;
       let offset = 0;
-      const runAndAccumulate = async (table: string, dateCol: string) => {
+      const runAndAccumulate = async (table: string) => {
         let query = supabase
           .from(table)
-          .select("id, product_id, warehouse_id, variance_quantity, correction_date, uploaded_at")
+          .select("id, product_id, warehouse_id, variance_quantity, correction_date")
           .in("product_id", productIds)
-          .order(dateCol, { ascending: true })
+          .order("correction_date", { ascending: true })
           .range(offset, offset + pageSize - 1);
         if (uuidList.length) query = query.in("warehouse_id", uuidList as any);
-        if (dateCol === "correction_date") {
-          if (useFromDate) query = query.gte("correction_date", useFromDate);
-          if (useToDate) query = query.lte("correction_date", useToDate);
-        } else {
-          if (startISO) query = query.gte("uploaded_at", startISO);
-          if (endISO) query = query.lt("uploaded_at", endISO);
-        }
+        if (useFromDate) query = query.gte("correction_date", useFromDate);
+        if (useToDate) query = query.lte("correction_date", useToDate);
         const { data, error } = await query;
         if (error) return { data: [] as any[], error };
         return { data: (data as any[]) ?? [], error: null };
@@ -238,7 +233,7 @@ export async function POST(req: Request) {
         let err: any = null;
 
         // Try stock_corrections (uuid, correction_date)
-        ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date"));
+        ({ data: rows, error: err } = await runAndAccumulate("stock_corrections"));
 
         if (err && !rows.length) {
           // If truly an error and no data, surface it
