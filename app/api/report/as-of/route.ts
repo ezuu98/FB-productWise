@@ -173,7 +173,7 @@ export async function POST(req: Request) {
       {
         let res = await supabase
           .from("warehouses")
-          .select("id, warehouse_id")
+          .select("id, uuid")
           .in("id", warehouseIds);
         if (res.error) {
           res = await supabase
