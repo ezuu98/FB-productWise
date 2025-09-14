@@ -239,10 +239,6 @@ export async function POST(req: Request) {
 
         // Try stock_corrections (uuid, correction_date)
         ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date"));
-        // If empty, try uploaded_at
-        if (err || rows.length === 0) {
-          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "uploaded_at"));
-        }
 
         if (err && !rows.length) {
           // If truly an error and no data, surface it
