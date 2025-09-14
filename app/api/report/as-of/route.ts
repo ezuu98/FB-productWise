@@ -173,20 +173,20 @@ export async function POST(req: Request) {
       {
         let res = await supabase
           .from("warehouses")
-          .select("id, uuid");
+          .select("id, uuid, warehouse_uuid");
         if (res.error) {
           res = await supabase
             .from("warehouses")
-            .select("id, *");
+            .select("id, uuid, warehouse_uuid");
         }
         if (res.error || !res.data || res.data.length === 0) {
           let res2 = await supabase
             .from("warehouse")
-            .select("id, uuid");
+            .select("id, uuid, warehouse_uuid");
           if (res2.error) {
             res2 = await supabase
               .from("warehouse")
-              .select("id, *");
+              .select("id, uuid, warehouse_uuid");
           }
           wrows = res2.data ?? [];
         } else {
@@ -197,7 +197,7 @@ export async function POST(req: Request) {
       const uuidToId = new Map<string, string>();
       for (const w of wrows ?? []) {
         const id = String(w.id);
-        const uuid = String((w as any).uuid ?? "");
+        const uuid = String((w as any).uuid ?? (w as any).warehouse_uuid ?? "");
         if (uuid) {
           idToUuid.set(id, uuid);
           uuidToId.set(uuid, id);
