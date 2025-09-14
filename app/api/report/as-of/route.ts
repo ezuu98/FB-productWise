@@ -216,7 +216,7 @@ export async function POST(req: Request) {
       const runAndAccumulate = async (table: string, dateCol: string, filterBy: "uuid" | "numeric") => {
         let query = supabase
           .from(table)
-          .select("id, product_id, warehouse_id, variance_quantity, variance, variance_qty, correction_date, created_at")
+          .select("id, product_id, warehouse_id, variance_quantity, correction_date, uploaded_at")
           .in("product_id", productIds)
           .order(dateCol, { ascending: true })
           .range(offset, offset + pageSize - 1);
@@ -226,8 +226,8 @@ export async function POST(req: Request) {
           if (useFromDate) query = query.gte("correction_date", useFromDate);
           if (useToDate) query = query.lte("correction_date", useToDate);
         } else {
-          if (startISO) query = query.gte("created_at", startISO);
-          if (endISO) query = query.lt("created_at", endISO);
+          if (startISO) query = query.gte("uploaded_at", startISO);
+          if (endISO) query = query.lt("uploaded_at", endISO);
         }
         const { data, error } = await query;
         if (error) return { data: [] as any[], error };
@@ -241,15 +241,15 @@ export async function POST(req: Request) {
 
         // Try stock_corrections (uuid, correction_date)
         ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date", "uuid"));
-        // If empty, try created_at
+        // If empty, try uploaded_at
         if (err || rows.length === 0) {
-          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "created_at", "uuid"));
+          ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "uploaded_at", "uuid"));
         }
         // If still empty, try numeric filter
         if (err || rows.length === 0) {
           ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "correction_date", "numeric"));
           if (rows.length === 0) {
-            ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "created_at", "numeric"));
+            ({ data: rows, error: err } = await runAndAccumulate("stock_corrections", "uploaded_at", "numeric"));
           }
         }
 
@@ -278,7 +278,7 @@ export async function POST(req: Request) {
           }
           const productId = String((row as any).product_id);
           const key = `${warehouseId}|${productId}`;
-          const qty = Number((row as any).variance_quantity ?? (row as any).variance ?? (row as any).variance_qty ?? 0);
+          const qty = Number((row as any).variance_quantity ?? 0);
           if (!Number.isFinite(qty)) continue;
           let agg = map.get(key);
           if (!agg) {
